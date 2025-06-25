@@ -12,7 +12,7 @@
             <h4>Available Filters</h4>
             @{
                 var fields = new[] {
-            "DatTraitement", "CodSens", "Qte", "Crs", "MntBrutDevNegociation", "NumCompte", "CodSociete",
+            "DatTraitement", "DateEffet", "CodSens", "Qte", "Crs", "MntBrutDevNegociation", "NumCompte", "CodSociete",
             "CodAssiste", "NomAbrege", "TypGestion", "CodIsin", "LibValeur", "CodOperation", "CodMarche",
             "CodAnnulation", "Nom", "Adr1", "Adr2", "Adr3", "Adr4", "Adr5", "Adr6", "AdrVille",
             "CodGerant", "CategorisationMIFID", "LieuNegociation"
@@ -29,11 +29,18 @@
 
         <!-- Main Filter Input Area -->
         <div style="flex-grow: 1;">
-            <!-- Date Range Filter -->
+            <!-- DatTraitement Filter -->
             <div id="DatTraitement" class="filter-field" style="display: none; margin-bottom: 1rem;">
                 <label><b>DatTraitement:</b></label><br />
                 From: <input type="date" name="DatTraitementStart" />
                 To: <input type="date" name="DatTraitementEnd" />
+            </div>
+
+            <!-- DateEffet Filter -->
+            <div id="DateEffet" class="filter-field" style="display: none; margin-bottom: 1rem;">
+                <label><b>DateEffet:</b></label><br />
+                From: <input type="date" name="DateEffetStart" />
+                To: <input type="date" name="DateEffetEnd" />
             </div>
 
             <!-- CodIsin Autocomplete Search -->
@@ -43,12 +50,12 @@
                 <ul id="isinSuggestions" style="list-style-type: none; padding-left: 0; max-height: 150px; overflow-y: auto; border: 1px solid #ccc; margin-top: 5px;"></ul>
             </div>
 
-            <!-- All other filters (text or number) -->
+            <!-- Other Filters -->
             @{
                 string[] numberFields = { "Qte", "Crs", "MntBrutDevNegociation" };
                 foreach (var field in fields)
                 {
-                    if (field == "DatTraitement" || field == "CodIsin") continue;
+                    if (field == "DatTraitement" || field == "DateEffet" || field == "CodIsin") continue;
                     <div id="@field" class="filter-field" style="display: none; margin-bottom: 1rem;">
                         <label><b>@field:</b></label><br />
                         <input type="@(numberFields.Contains(field) ? "number" : "text")" name="@field" style="width: 300px;" />
