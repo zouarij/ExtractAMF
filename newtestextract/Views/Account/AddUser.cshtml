@@ -1,0 +1,15 @@
+﻿@model newtestextract.Models.User
+
+<h2>Ajouter un utilisateur</h2>
+
+<form asp-action="AddUser" method="post">
+    <div>
+        <label>Nom d'utilisateur:</label>
+        <input asp-for="Username" />
+    </div>
+    <div>
+        <label>Mot de passe:</label>
+        <input asp-for="Password" type="password" />
+    </div>
+    <button type="submit">Ajouter</button>
+</form>

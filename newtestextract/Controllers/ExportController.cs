@@ -16,6 +16,11 @@ namespace newtestextract.Controllers
 
         public IActionResult Index()
         {
+            var user = HttpContext.Session.GetString("username");
+
+            if (string.IsNullOrEmpty(user))
+                return RedirectToAction("Login", "Account");
+
             ViewBag.StatusOptions = new[] { "Active", "Pending", "Closed" };
             return View();
         }
@@ -43,7 +48,6 @@ namespace newtestextract.Controllers
                     conn.Open();
                     using (var reader = cmd.ExecuteReader())
                     {
-                        // Write header
                         for (int i = 0; i < reader.FieldCount; i++)
                         {
                             csv.Append(reader.GetName(i));
@@ -51,7 +55,6 @@ namespace newtestextract.Controllers
                         }
                         csv.AppendLine();
 
-                        // Write data
                         while (reader.Read())
                         {
                             for (int i = 0; i < reader.FieldCount; i++)

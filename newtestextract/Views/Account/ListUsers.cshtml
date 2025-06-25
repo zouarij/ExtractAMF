@@ -1,0 +1,21 @@
+﻿@model List<newtestextract.Models.User>
+
+<h2>Liste des utilisateurs</h2>
+
+<table border="1">
+    <tr>
+        <th>ID</th>
+        <th>Nom d'utilisateur</th>
+        <th>Mot de passe</th>
+    </tr>
+    @foreach (var user in Model)
+    {
+        <tr>
+            <td>@user.Id</td>
+            <td>@user.Username</td>
+            <td>@user.Password</td>
+        </tr>
+    }
+</table>
+
+<a href="/Account/AddUser">Ajouter un utilisateur</a>
