@@ -4,21 +4,95 @@
 
 <h2>Export to CSV</h2>
 
-
 <form asp-action="Export" method="post">
-    <label>Status:</label>
-    <select name="status">
-        @foreach (var item in ViewBag.StatusOptions)
-        {
-            <option value="@item">@item</option>
-        }
-    </select>
+    <div style="display: flex; align-items: flex-start; gap: 2rem;">
 
-    <label>Start Date:</label>
-    <input type="date" name="startDate" required />
+        <!-- Sidebar: Filter Checkboxes -->
+        <div style="width: 250px; border-right: 1px solid #ccc; padding-right: 1rem;">
+            <h4>Available Filters</h4>
+            @{
+                var fields = new[] {
+            "DatTraitement", "CodSens", "Qte", "Crs", "MntBrutDevNegociation", "NumCompte", "CodSociete",
+            "CodAssiste", "NomAbrege", "TypGestion", "CodIsin", "LibValeur", "CodOperation", "CodMarche",
+            "CodAnnulation", "Nom", "Adr1", "Adr2", "Adr3", "Adr4", "Adr5", "Adr6", "AdrVille",
+            "CodGerant", "CategorisationMIFID", "LieuNegociation"
+            };
+            }
+            @foreach (var field in fields)
+            {
+                <div style="margin-bottom: 8px;">
+                    <input type="checkbox" id="chk_@field" onclick="toggleFilter('@field')" />
+                    <label for="chk_@field">@field</label>
+                </div>
+            }
+        </div>
 
-    <label>End Date:</label>
-    <input type="date" name="endDate" required />
+        <!-- Main Filter Input Area -->
+        <div style="flex-grow: 1;">
+            <!-- Date Range Filter -->
+            <div id="DatTraitement" class="filter-field" style="display: none; margin-bottom: 1rem;">
+                <label><b>DatTraitement:</b></label><br />
+                From: <input type="date" name="DatTraitementStart" />
+                To: <input type="date" name="DatTraitementEnd" />
+            </div>
 
-    <button type="submit">Export</button>
+            <!-- CodIsin Autocomplete Search -->
+            <div id="CodIsin" class="filter-field" style="display: none; margin-bottom: 1rem;">
+                <label><b>CodIsin (Search):</b></label><br />
+                <input type="text" id="codIsinInput" name="CodIsin" oninput="fetchCodIsin()" autocomplete="off" style="width: 300px;" />
+                <ul id="isinSuggestions" style="list-style-type: none; padding-left: 0; max-height: 150px; overflow-y: auto; border: 1px solid #ccc; margin-top: 5px;"></ul>
+            </div>
+
+            <!-- All other filters (text or number) -->
+            @{
+                string[] numberFields = { "Qte", "Crs", "MntBrutDevNegociation" };
+                foreach (var field in fields)
+                {
+                    if (field == "DatTraitement" || field == "CodIsin") continue;
+                    <div id="@field" class="filter-field" style="display: none; margin-bottom: 1rem;">
+                        <label><b>@field:</b></label><br />
+                        <input type="@(numberFields.Contains(field) ? "number" : "text")" name="@field" style="width: 300px;" />
+                    </div>
+                }
+            }
+
+            <button type="submit" style="margin-top: 1rem; padding: 0.5rem 1rem;">Export CSV</button>
+        </div>
+    </div>
 </form>
+
+<!-- Scripts -->
+<script>
+    function toggleFilter(id) {
+        const el = document.getElementById(id);
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function fetchCodIsin() {
+        const input = document.getElementById("codIsinInput");
+        const value = input.value.trim();
+        const list = document.getElementById("isinSuggestions");
+
+        if (value.length === 0) {
+            list.innerHTML = "";
+            return;
+        }
+
+        fetch(`/export/SearchCodIsin?term=${encodeURIComponent(value)}`)
+            .then(res => res.json())
+            .then(data => {
+                list.innerHTML = "";
+                data.forEach(item => {
+                    const li = document.createElement("li");
+                    li.textContent = item;
+                    li.style.cursor = "pointer";
+                    li.style.padding = "5px";
+                    li.onclick = () => {
+                        input.value = item;
+                        list.innerHTML = "";
+                    };
+                    list.appendChild(li);
+                });
+            });
+    }
+</script>
