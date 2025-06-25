@@ -1,25 +1,115 @@
 ﻿@{
+    Layout = null;
     ViewBag.Title = "Login";
 }
 
-<h2>Login</h2>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - ODDO BHF</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', sans-serif;
+            height: 100%;
+            background-color: #f5f5f5;
+            background: url('/Content/your-background.jpg') no-repeat center center;
+        }
 
-@using (Html.BeginForm("Login", "Account", FormMethod.Post))
-{
-    <div>
-        <label>Username:</label>
-        @Html.TextBox("username")
-    </div>
-    <div>
-        <label>Password:</label>
-        @Html.Password("password")
-    </div>
-    <div>
-        <button type="submit">Login</button>
-    </div>
+        .login-wrapper {
+            display: flex;
+            height: 100vh;
+        }
 
-    @if (ViewBag.Error != null)
-    {
-        <p style="color:red;">@ViewBag.Error</p>
-    }
-}
+        .login-left {
+            width: 100%;
+            max-width: 400px;
+            background: #ffffff;
+            padding: 60px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #c00000;
+            margin-bottom: 40px;
+        }
+
+        label {
+            font-weight: 500;
+            margin-top: 20px;
+            display: block;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .submit-btn {
+            margin-top: 25px;
+            padding: 10px 20px;
+            background-color: #c00000;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+            .submit-btn:hover {
+                background-color: #a00000;
+            }
+
+        a {
+            display: inline-block;
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #444;
+            text-decoration: underline;
+        }
+
+        .error-msg {
+            color: red;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="login-left">
+            <div class="logo">
+                <img src="/Content/oddo-logo.png" alt="ODDO BHF" style="width: 120px; margin-bottom: 20px;" />
+            </div>
+
+            @using (Html.BeginForm("Login", "Account", FormMethod.Post))
+            {
+                <label for="username">Nom d'utilisateur</label>
+                @Html.TextBox("username", null, new { @type = "text", @placeholder = "Nom d'utilisateur" })
+
+                <label for="password">Mot de passe</label>
+                @Html.Password("password", new { @placeholder = "Mot de passe" })
+
+                <a href="#">Changer mon mot de passe</a>
+
+                <button type="submit" class="submit-btn">VALIDER</button>
+
+                @if (ViewBag.Error != null)
+                {
+                    <p class="error-msg">@ViewBag.Error</p>
+                }
+            }
+        </div>
+    </div>
+</body>
+</html>
