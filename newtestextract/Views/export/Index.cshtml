@@ -1,0 +1,23 @@
+﻿@{
+    ViewData["Title"] = "Export Data to CSV";
+}
+
+<h2>Export to CSV</h2>
+
+<form asp-action="Export" method="post">
+    <label>Status:</label>
+    <select name="status">
+        @foreach (var item in ViewBag.StatusOptions)
+        {
+            <option value="@item">@item</option>
+        }
+    </select>
+
+    <label>Start Date:</label>
+    <input type="date" name="startDate" required />
+
+    <label>End Date:</label>
+    <input type="date" name="endDate" required />
+
+    <button type="submit">Export</button>
+</form>
