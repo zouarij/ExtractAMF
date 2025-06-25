@@ -17,13 +17,12 @@ namespace newtestextract.Controllers
         public IActionResult Index()
         {
             var user = HttpContext.Session.GetString("username");
-
             if (string.IsNullOrEmpty(user))
                 return RedirectToAction("Login", "Account");
 
-            ViewBag.StatusOptions = new[] { "Active", "Pending", "Closed" };
             return View();
         }
+
         [HttpGet]
         public JsonResult SearchCodIsin(string term)
         {
@@ -32,7 +31,11 @@ namespace newtestextract.Controllers
 
             using (var conn = new SqlConnection(connectionString))
             {
-                string query = "SELECT DISTINCT CodIsin FROM TestData WHERE CodIsin LIKE @term + '%'";
+                string query = @"
+                    SELECT TOP 15 DISTINCT CodIsin
+                    FROM TestData
+                    WHERE CodIsin LIKE @term + '%'
+                    ORDER BY CodIsin";
 
                 using (var cmd = new SqlCommand(query, conn))
                 {
@@ -51,6 +54,7 @@ namespace newtestextract.Controllers
 
             return Json(result);
         }
+
         [HttpPost]
         public IActionResult Export(IFormCollection form)
         {
@@ -62,9 +66,10 @@ namespace newtestextract.Controllers
                 var query = new StringBuilder("SELECT * FROM dbo.TestData WHERE 1=1");
                 var cmd = new SqlCommand();
 
-                // List of known filterable columns and their types
                 var filterFields = new Dictionary<string, string>
                 {
+                    ["DateEffetStart"] = "date",
+                    ["DateEffetEnd"] = "date",
                     ["DatTraitementStart"] = "date",
                     ["DatTraitementEnd"] = "date",
                     ["CodSens"] = "text",
@@ -99,13 +104,29 @@ namespace newtestextract.Controllers
                     var value = form[key];
                     if (!string.IsNullOrEmpty(value))
                     {
-                        if (key == "DatTraitementStart" && form["DatTraitementEnd"].Count > 0)
+                        if (key == "DateEffetStart" && form["DateEffetEnd"].Count > 0)
                         {
-                            query.Append(" AND DatTraitement >= @DatTraitementStart AND DatTraitement <= @DatTraitementEnd");
-                            cmd.Parameters.AddWithValue("@DatTraitementStart", DateTime.Parse(form["DatTraitementStart"]));
-                            cmd.Parameters.AddWithValue("@DatTraitementEnd", DateTime.Parse(form["DatTraitementEnd"]));
+                            if (DateTime.TryParse(form["DateEffetStart"], out var start) &&
+                                DateTime.TryParse(form["DateEffetEnd"], out var end))
+                            {
+                                end = end.Date.AddDays(1).AddTicks(-1);
+                                query.Append(" AND DateEffet >= @DateEffetStart AND DateEffet <= @DateEffetEnd");
+                                cmd.Parameters.AddWithValue("@DateEffetStart", start);
+                                cmd.Parameters.AddWithValue("@DateEffetEnd", end);
+                            }
                         }
-                        else if (!key.Contains("DatTraitement")) // avoid double-handling date
+                        else if (key == "DatTraitementStart" && form["DatTraitementEnd"].Count > 0)
+                        {
+                            if (DateTime.TryParse(form["DatTraitementStart"], out var start) &&
+                                DateTime.TryParse(form["DatTraitementEnd"], out var end))
+                            {
+                                end = end.Date.AddDays(1).AddTicks(-1);
+                                query.Append(" AND DatTraitement >= @DatTraitementStart AND DatTraitement <= @DatTraitementEnd");
+                                cmd.Parameters.AddWithValue("@DatTraitementStart", start);
+                                cmd.Parameters.AddWithValue("@DatTraitementEnd", end);
+                            }
+                        }
+                        else if (!key.Contains("DateEffet") && !key.Contains("DatTraitement"))
                         {
                             query.Append($" AND {key} = @{key}");
                             cmd.Parameters.AddWithValue($"@{key}", value.ToString());
@@ -144,12 +165,8 @@ namespace newtestextract.Controllers
                 }
             }
 
-           
-
-        byte[] fileBytes = Encoding.UTF8.GetBytes(csv.ToString());
+            byte[] fileBytes = Encoding.UTF8.GetBytes(csv.ToString());
             return File(fileBytes, "text/csv", "export.csv");
         }
-
-
     }
 }
