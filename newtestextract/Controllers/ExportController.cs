@@ -61,6 +61,8 @@ namespace newtestextract.Controllers
             string connectionString = _config.GetConnectionString("DefaultConnection");
             var csv = new StringBuilder();
 
+           
+
             using (var conn = new SqlConnection(connectionString))
             {
                 var query = new StringBuilder("SELECT * FROM dbo.TestData WHERE 1=1");
@@ -98,7 +100,14 @@ namespace newtestextract.Controllers
                     ["CategorisationMIFID"] = "text",
                     ["LieuNegociation"] = "text"
                 };
-
+                var hasFilter = filterFields.Keys.Any(key =>
+               form.ContainsKey(key) && !string.IsNullOrWhiteSpace(form[key])
+           );
+                if (!hasFilter)
+                {
+                    TempData["Error"] = "Please select at least one filter before exporting.";
+                    return RedirectToAction("Index");
+                }
                 foreach (var key in filterFields.Keys)
                 {
                     var value = form[key];

@@ -1,7 +1,10 @@
 ﻿@{
     ViewData["Title"] = "Export Data to CSV";
 }
-
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
 <h2>Export to CSV</h2>
 
 <form asp-action="Export" method="post">

@@ -75,7 +75,6 @@ namespace newtestextract.Controllers
         [HttpPost]
         public ActionResult Login(string username, string password)
         {
-            // Validate empty fields
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             {
                 ViewBag.Error = "Username and password are required.";
