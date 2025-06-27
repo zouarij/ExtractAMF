@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 
@@ -179,3 +180,70 @@ namespace newtestextract.Controllers
         }
     }
 }
+/*CREATE PROCEDURE ExportFilteredData
+    @DateEffetStart DATE = NULL,
+    @DateEffetEnd DATE = NULL,
+    @DatTraitementStart DATE = NULL,
+    @DatTraitementEnd DATE = NULL,
+    @CodSens NVARCHAR(50) = NULL,
+    @Qte FLOAT = NULL,
+    @Crs FLOAT = NULL,
+    @MntBrutDevNegociation FLOAT = NULL,
+    @NumCompte NVARCHAR(50) = NULL,
+    @CodSociete NVARCHAR(50) = NULL,
+    @CodAssiste NVARCHAR(50) = NULL,
+    @NomAbrege NVARCHAR(50) = NULL,
+    @TypGestion NVARCHAR(50) = NULL,
+    @CodIsin NVARCHAR(50) = NULL,
+    @LibValeur NVARCHAR(255) = NULL,
+    @CodOperation NVARCHAR(50) = NULL,
+    @CodMarche NVARCHAR(50) = NULL,
+    @CodAnnulation NVARCHAR(50) = NULL,
+    @Nom NVARCHAR(255) = NULL,
+    @Adr1 NVARCHAR(255) = NULL,
+    @Adr2 NVARCHAR(255) = NULL,
+    @Adr3 NVARCHAR(255) = NULL,
+    @Adr4 NVARCHAR(255) = NULL,
+    @Adr5 NVARCHAR(255) = NULL,
+    @Adr6 NVARCHAR(255) = NULL,
+    @AdrVille NVARCHAR(255) = NULL,
+    @CodGerant NVARCHAR(50) = NULL,
+    @CategorisationMIFID NVARCHAR(50) = NULL,
+    @LieuNegociation NVARCHAR(50) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+SELECT*
+FROM TestData
+    WHERE
+        (@DateEffetStart IS NULL OR DateEffet >= @DateEffetStart) AND
+        (@DateEffetEnd IS NULL OR DateEffet <= @DateEffetEnd) AND
+        (@DatTraitementStart IS NULL OR DatTraitement >= @DatTraitementStart) AND
+        (@DatTraitementEnd IS NULL OR DatTraitement <= @DatTraitementEnd) AND
+        (@CodSens IS NULL OR CodSens = @CodSens) AND
+        (@Qte IS NULL OR Qte = @Qte) AND
+        (@Crs IS NULL OR Crs = @Crs) AND
+        (@MntBrutDevNegociation IS NULL OR MntBrutDevNegociation = @MntBrutDevNegociation) AND
+        (@NumCompte IS NULL OR NumCompte = @NumCompte) AND
+        (@CodSociete IS NULL OR CodSociete = @CodSociete) AND
+        (@CodAssiste IS NULL OR CodAssiste = @CodAssiste) AND
+        (@NomAbrege IS NULL OR NomAbrege = @NomAbrege) AND
+        (@TypGestion IS NULL OR TypGestion = @TypGestion) AND
+        (@CodIsin IS NULL OR CodIsin = @CodIsin) AND
+        (@LibValeur IS NULL OR LibValeur = @LibValeur) AND
+        (@CodOperation IS NULL OR CodOperation = @CodOperation) AND
+        (@CodMarche IS NULL OR CodMarche = @CodMarche) AND
+        (@CodAnnulation IS NULL OR CodAnnulation = @CodAnnulation) AND
+        (@Nom IS NULL OR Nom = @Nom) AND
+        (@Adr1 IS NULL OR Adr1 = @Adr1) AND
+        (@Adr2 IS NULL OR Adr2 = @Adr2) AND
+        (@Adr3 IS NULL OR Adr3 = @Adr3) AND
+        (@Adr4 IS NULL OR Adr4 = @Adr4) AND
+        (@Adr5 IS NULL OR Adr5 = @Adr5) AND
+        (@Adr6 IS NULL OR Adr6 = @Adr6) AND
+        (@AdrVille IS NULL OR AdrVille = @AdrVille) AND
+        (@CodGerant IS NULL OR CodGerant = @CodGerant) AND
+        (@CategorisationMIFID IS NULL OR CategorisationMIFID = @CategorisationMIFID) AND
+        (@LieuNegociation IS NULL OR LieuNegociation = @LieuNegociation);
+END;*/
