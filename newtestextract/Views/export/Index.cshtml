@@ -1,10 +1,12 @@
 ﻿@{
     ViewData["Title"] = "Export Data to CSV";
 }
+
 @if (TempData["Error"] != null)
 {
     <div class="alert alert-danger">@TempData["Error"]</div>
 }
+
 <h2>Export to CSV</h2>
 
 <form asp-action="Export" method="post">
@@ -30,27 +32,26 @@
             }
         </div>
 
-        <!-- Main Filter Input Area -->
+        <!-- Main Filter Inputs -->
         <div style="flex-grow: 1;">
-            <!-- DatTraitement Filter -->
-            <div id="DatTraitement" class="filter-field" style="display: none; margin-bottom: 1rem;">
+            <!-- Date Ranges -->
+            <div id="DatTraitement" class="filter-field" style="display:none; margin-bottom:1rem;">
                 <label><b>DatTraitement:</b></label><br />
                 From: <input type="date" name="DatTraitementStart" />
                 To: <input type="date" name="DatTraitementEnd" />
             </div>
 
-            <!-- DateEffet Filter -->
-            <div id="DateEffet" class="filter-field" style="display: none; margin-bottom: 1rem;">
+            <div id="DateEffet" class="filter-field" style="display:none; margin-bottom:1rem;">
                 <label><b>DateEffet:</b></label><br />
                 From: <input type="date" name="DateEffetStart" />
                 To: <input type="date" name="DateEffetEnd" />
             </div>
 
-            <!-- CodIsin Autocomplete Search -->
-            <div id="CodIsin" class="filter-field" style="display: none; margin-bottom: 1rem;">
+            <!-- CodIsin Autocomplete -->
+            <div id="CodIsin" class="filter-field" style="display:none; margin-bottom:1rem;">
                 <label><b>CodIsin (Search):</b></label><br />
-                <input type="text" id="codIsinInput" name="CodIsin" oninput="fetchCodIsin()" autocomplete="off" style="width: 300px;" />
-                <ul id="isinSuggestions" style="list-style-type: none; padding-left: 0; max-height: 150px; overflow-y: auto; border: 1px solid #ccc; margin-top: 5px;"></ul>
+                <input type="text" id="codIsinInput" name="CodIsin" oninput="fetchCodIsin()" autocomplete="off" style="width:300px;" />
+                <ul id="isinSuggestions" style="list-style:none; padding-left:0; max-height:150px; overflow-y:auto; border:1px solid #ccc; margin-top:5px;"></ul>
             </div>
 
             <!-- Other Filters -->
@@ -59,23 +60,62 @@
                 foreach (var field in fields)
                 {
                     if (field == "DatTraitement" || field == "DateEffet" || field == "CodIsin") continue;
-                    <div id="@field" class="filter-field" style="display: none; margin-bottom: 1rem;">
+                    <div id="@field" class="filter-field" style="display:none; margin-bottom:1rem;">
                         <label><b>@field:</b></label><br />
-                        <input type="@(numberFields.Contains(field) ? "number" : "text")" name="@field" style="width: 300px;" />
+                        <input type="@(numberFields.Contains(field) ? "number" : "text")" name="@field" style="width:300px;" />
                     </div>
                 }
             }
 
-            <button type="submit" style="margin-top: 1rem; padding: 0.5rem 1rem;">Export CSV</button>
+            <button type="submit" style="margin-top:1rem; padding:0.5rem 1rem;">Export CSV</button>
         </div>
     </div>
 </form>
 
-<!-- Scripts -->
+<div style="display:flex; margin-top: 2rem;">
+    <!-- Pagination and Data Table -->
+    <div style="width: 100%; overflow:auto; max-height:600px;">
+        <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+            Page:
+            @if (ViewBag.TotalPages != null && ViewBag.CurrentPage != null)
+            {
+                for (int i = 1; i <= (int)ViewBag.TotalPages; i++)
+                {
+                    var isActive = (i == (int)ViewBag.CurrentPage) ? "font-weight: bold;" : "";
+                    <a href="?page=@i" style="margin-left:5px; @isActive">@i</a>
+                }
+            }
+        </div>
+
+        <table class="table table-bordered table-sm table-striped" style="min-width:1500px;">
+            <thead>
+                <tr>
+                    @foreach (var col in ViewBag.Columns as List<string>)
+                    {
+                        <th>@col</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in ViewBag.PageData as List<List<string>>)
+                {
+                    <tr>
+                        @foreach (var cell in row)
+                        {
+                            <td>@cell</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <script>
     function toggleFilter(id) {
         const el = document.getElementById(id);
-        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        if (!el) return;
+        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
     }
 
     function fetchCodIsin() {
@@ -106,3 +146,4 @@
             });
     }
 </script>
+

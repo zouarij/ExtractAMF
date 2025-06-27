@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Data;
+using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -9,65 +10,30 @@ namespace newtestextract.Controllers
     public class exportController : Controller
     {
         private readonly IConfiguration _config;
-
-        public exportController(IConfiguration config)
+        private readonly ILogger<exportController> _logger;
+        public exportController(IConfiguration config, ILogger<exportController> logger)
         {
             _config = config;
+            _logger = logger; // ⬅️ Cette ligne manquait
         }
 
-        public IActionResult Index()
+        public IActionResult Index(IFormCollection form = null, int page = 1, int pageSize = 1000)
         {
             var user = HttpContext.Session.GetString("username");
             if (string.IsNullOrEmpty(user))
                 return RedirectToAction("Login", "Account");
 
-            return View();
-        }
+            var rows = new List<List<string>>();
+            var columns = new List<string>();
+            var totalRows = 0;
 
-        [HttpGet]
-        public JsonResult SearchCodIsin(string term)
-        {
-            string connectionString = _config.GetConnectionString("DefaultConnection");
-            var result = new List<string>();
-
-            using (var conn = new SqlConnection(connectionString))
+            using (var conn = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
-                string query = @"
-                    SELECT TOP 15 DISTINCT CodIsin
-                    FROM TestData
-                    WHERE CodIsin LIKE @term + '%'
-                    ORDER BY CodIsin";
-
-                using (var cmd = new SqlCommand(query, conn))
-                {
-                    cmd.Parameters.AddWithValue("@term", term ?? "");
-
-                    conn.Open();
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            result.Add(reader.GetString(0));
-                        }
-                    }
-                }
-            }
-
-            return Json(result);
-        }
-
-        [HttpPost]
-        public IActionResult Export(IFormCollection form)
-        {
-            string connectionString = _config.GetConnectionString("DefaultConnection");
-            var csv = new StringBuilder();
-
-           
-
-            using (var conn = new SqlConnection(connectionString))
-            {
-                var query = new StringBuilder("SELECT * FROM dbo.TestData WHERE 1=1");
                 var cmd = new SqlCommand();
+                cmd.Connection = conn;
+
+                var query = new StringBuilder("SELECT * FROM TestData WHERE 1=1");
+                var countQuery = new StringBuilder("SELECT COUNT(*) FROM TestData WHERE 1=1");
 
                 var filterFields = new Dictionary<string, string>
                 {
@@ -101,14 +67,188 @@ namespace newtestextract.Controllers
                     ["CategorisationMIFID"] = "text",
                     ["LieuNegociation"] = "text"
                 };
+
+                var hasFilter = filterFields.Keys.Any(k => form != null && form.ContainsKey(k) && !string.IsNullOrWhiteSpace(form[k]));
+
+                if (!hasFilter)
+                {
+                    ViewBag.ShowTable = false;
+                    ViewBag.Columns = new List<string>();
+                    ViewBag.PageData = new List<List<string>>();
+                    return View();
+                }
+
+                foreach (var key in filterFields.Keys)
+                {
+                    var value = form[key];
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        if (key == "DateEffetStart" && form["DateEffetEnd"].Count > 0)
+                        {
+                            if (DateTime.TryParse(form["DateEffetStart"], out var start) &&
+                                DateTime.TryParse(form["DateEffetEnd"], out var end))
+                            {
+                                end = end.Date.AddDays(1).AddTicks(-1);
+                                query.Append(" AND dateeffet >= @DateEffetStart AND dateeffet <= @DateEffetEnd");
+                                countQuery.Append(" AND dateeffet >= @DateEffetStart AND dateeffet <= @DateEffetEnd");
+                                cmd.Parameters.AddWithValue("@DateEffetStart", start);
+                                cmd.Parameters.AddWithValue("@DateEffetEnd", end);
+                            }
+                        }
+                        else if (key == "DatTraitementStart" && form["DatTraitementEnd"].Count > 0)
+                        {
+                            if (DateTime.TryParse(form["DatTraitementStart"], out var start) &&
+                                DateTime.TryParse(form["DatTraitementEnd"], out var end))
+                            {
+                                end = end.Date.AddDays(1).AddTicks(-1);
+                                query.Append(" AND DatTraitement >= @DatTraitementStart AND DatTraitement <= @DatTraitementEnd");
+                                countQuery.Append(" AND DatTraitement >= @DatTraitementStart AND DatTraitement <= @DatTraitementEnd");
+                                cmd.Parameters.AddWithValue("@DatTraitementStart", start);
+                                cmd.Parameters.AddWithValue("@DatTraitementEnd", end);
+                            }
+                        }
+                        else if (!key.Contains("DateEffet") && !key.Contains("DatTraitement"))
+                        {
+                            query.Append($" AND {key} = @{key}");
+                            countQuery.Append($" AND {key} = @{key}");
+                            cmd.Parameters.AddWithValue($"@{key}", value.ToString());
+                        }
+                    }
+                }
+
+                int offset = (page - 1) * pageSize;
+                query.Append(" ORDER BY DateEffet DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+                cmd.Parameters.AddWithValue("@Offset", offset);
+                cmd.Parameters.AddWithValue("@PageSize", pageSize);
+
+                // First get column names and data
+                cmd.CommandText = query.ToString();
+                conn.Open();
+                using (var reader = cmd.ExecuteReader())
+                {
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        columns.Add(reader.GetName(i));
+                    }
+
+                    while (reader.Read())
+                    {
+                        var row = new List<string>();
+                        for (int i = 0; i < reader.FieldCount; i++)
+                        {
+                            row.Add(reader[i].ToString());
+                        }
+                        rows.Add(row);
+                    }
+                }
+
+                // Now get count
+                cmd.Parameters.Remove(cmd.Parameters["@Offset"]);
+                cmd.Parameters.Remove(cmd.Parameters["@PageSize"]);
+                cmd.CommandText = countQuery.ToString();
+                totalRows = (int)cmd.ExecuteScalar();
+            }
+
+            int totalPages = (int)Math.Ceiling((double)totalRows / pageSize);
+
+            ViewBag.ShowTable = true;
+            ViewBag.Columns = columns;
+            ViewBag.PageData = rows;
+            ViewBag.TotalPages = totalPages;
+            ViewBag.CurrentPage = page;
+
+            return View();
+        }
+
+        [HttpGet]
+        public JsonResult SearchCodIsin(string term)
+        {
+            string connectionString = _config.GetConnectionString("DefaultConnection");
+            var result = new List<string>();
+
+            using (var conn = new SqlConnection(connectionString))
+            {
+                string query = @"
+                    SELECT DISTINCT TOP 15  CodIsin
+                    FROM TestData
+                    WHERE CodIsin LIKE @term + '%'
+                    ORDER BY CodIsin";
+
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@term", term ?? "");
+
+                    conn.Open();
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            result.Add(reader.GetString(0));
+                        }
+                    }
+                }
+            }
+
+            return Json(result);
+        }
+
+        [HttpPost]
+        [HttpPost]
+        public IActionResult Export(IFormCollection form, int page = 1, int pageSize = 1000, string sortColumn = null, string sortDirection = "DESC")
+        {
+            string connectionString = _config.GetConnectionString("DefaultConnection");
+            var csv = new StringBuilder();
+
+            using (var conn = new SqlConnection(connectionString))
+            {
+                var query = new StringBuilder("SELECT * FROM dbo.TestData WHERE 1=1");
+                var cmd = new SqlCommand();
+                cmd.Connection = conn;
+                cmd.CommandTimeout = 180; // 3 minutes timeout
+
+                var filterFields = new Dictionary<string, string>
+                {
+                    ["DateEffetStart"] = "date",
+                    ["DateEffetEnd"] = "date",
+                    ["DatTraitementStart"] = "date",
+                    ["DatTraitementEnd"] = "date",
+                    ["CodSens"] = "text",
+                    ["Qte"] = "number",
+                    ["Crs"] = "number",
+                    ["MntBrutDevNegociation"] = "number",
+                    ["NumCompte"] = "text",
+                    ["CodSociete"] = "text",
+                    ["CodAssiste"] = "text",
+                    ["NomAbrege"] = "text",
+                    ["TypGestion"] = "text",
+                    ["CodIsin"] = "text",
+                    ["LibValeur"] = "text",
+                    ["CodOperation"] = "text",
+                    ["CodMarche"] = "text",
+                    ["CodAnnulation"] = "text",
+                    ["Nom"] = "text",
+                    ["Adr1"] = "text",
+                    ["Adr2"] = "text",
+                    ["Adr3"] = "text",
+                    ["Adr4"] = "text",
+                    ["Adr5"] = "text",
+                    ["Adr6"] = "text",
+                    ["AdrVille"] = "text",
+                    ["CodGerant"] = "text",
+                    ["CategorisationMIFID"] = "text",
+                    ["LieuNegociation"] = "text"
+                };
+
                 var hasFilter = filterFields.Keys.Any(key =>
-               form.ContainsKey(key) && !string.IsNullOrWhiteSpace(form[key])
-           );
+                   form.ContainsKey(key) && !string.IsNullOrWhiteSpace(form[key])
+                );
+
                 if (!hasFilter)
                 {
                     TempData["Error"] = "Please select at least one filter before exporting.";
                     return RedirectToAction("Index");
                 }
+
                 foreach (var key in filterFields.Keys)
                 {
                     var value = form[key];
@@ -120,7 +260,7 @@ namespace newtestextract.Controllers
                                 DateTime.TryParse(form["DateEffetEnd"], out var end))
                             {
                                 end = end.Date.AddDays(1).AddTicks(-1);
-                                query.Append(" AND DateEffet >= @DateEffetStart AND DateEffet <= @DateEffetEnd");
+                                query.Append(" AND dateffet >= @DateEffetStart AND dateffet <= @DateEffetEnd");
                                 cmd.Parameters.AddWithValue("@DateEffetStart", start);
                                 cmd.Parameters.AddWithValue("@DateEffetEnd", end);
                             }
@@ -142,14 +282,41 @@ namespace newtestextract.Controllers
                             cmd.Parameters.AddWithValue($"@{key}", value.ToString());
                         }
                     }
+                    _logger.LogInformation("Final Query: {Query}", query.ToString());
+
+                    foreach (SqlParameter param in cmd.Parameters)
+                    {
+                        _logger.LogInformation("Parameter: {Name} = {Value}", param.ParameterName, param.Value);
+                    }
                 }
 
+                // Allowed columns for sorting, include 'dateffet' exactly as in DB
+                var validColumns = new HashSet<string>(filterFields.Keys.Select(k => k.ToLower()))
+        {
+            "id", "dateffet" // add other columns you want to allow sorting by
+        };
+
+                // Normalize and validate sort column
+                if (string.IsNullOrEmpty(sortColumn) || !validColumns.Contains(sortColumn.ToLower()))
+                {
+                    sortColumn = "dateffet"; // default sort column
+                }
+
+                sortDirection = sortDirection?.ToUpper() == "ASC" ? "ASC" : "DESC";
+
+                query.Append($" ORDER BY {sortColumn} {sortDirection}");
+
+                int offset = (page - 1) * pageSize;
+                query.Append(" OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+                cmd.Parameters.AddWithValue("@Offset", offset);
+                cmd.Parameters.AddWithValue("@PageSize", pageSize);
+
                 cmd.CommandText = query.ToString();
-                cmd.Connection = conn;
 
                 conn.Open();
-                using (var reader = cmd.ExecuteReader())
+                using (var reader = cmd.ExecuteReader(CommandBehavior.SequentialAccess))
                 {
+                    // Write CSV header
                     for (int i = 0; i < reader.FieldCount; i++)
                     {
                         csv.Append(reader.GetName(i));
@@ -157,6 +324,7 @@ namespace newtestextract.Controllers
                     }
                     csv.AppendLine();
 
+                    // Write CSV rows
                     while (reader.Read())
                     {
                         for (int i = 0; i < reader.FieldCount; i++)
@@ -164,7 +332,7 @@ namespace newtestextract.Controllers
                             object rawValue = reader[i];
                             string value = rawValue is DateTime dt
                                 ? dt.ToString("yyyy-MM-dd")
-                                : rawValue.ToString();
+                                : rawValue?.ToString() ?? "";
 
                             value = value.Replace("\"", "\"\"");
                             csv.Append($"\"{value}\"");
@@ -176,7 +344,7 @@ namespace newtestextract.Controllers
             }
 
             byte[] fileBytes = Encoding.UTF8.GetBytes(csv.ToString());
-            return File(fileBytes, "text/csv", "export.csv");
+            return File(fileBytes, "text/csv", $"export_page{page}.csv");
         }
     }
 }
