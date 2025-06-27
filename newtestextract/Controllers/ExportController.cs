@@ -1,7 +1,5 @@
 ﻿using System.Data;
 using System.Text;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 
@@ -199,124 +197,113 @@ namespace newtestextract.Controllers
             string connectionString = _config.GetConnectionString("DefaultConnection");
             var csv = new StringBuilder();
 
-            using (var conn = new SqlConnection(connectionString))
+            var query = new StringBuilder("SELECT * FROM dbo.TestData WHERE 1=1");
+            var filterFields = new Dictionary<string, string>
             {
-                var query = new StringBuilder("SELECT * FROM dbo.TestData WHERE 1=1");
-                var cmd = new SqlCommand();
-                cmd.Connection = conn;
-                cmd.CommandTimeout = 180; // 3 minutes timeout
+                ["DateEffetStart"] = "date",
+                ["DateEffetEnd"] = "date",
+                ["DatTraitementStart"] = "date",
+                ["DatTraitementEnd"] = "date",
+                ["CodSens"] = "text",
+                ["Qte"] = "number",
+                ["Crs"] = "number",
+                ["MntBrutDevNegociation"] = "number",
+                ["NumCompte"] = "text",
+                ["CodSociete"] = "text",
+                ["CodAssiste"] = "text",
+                ["NomAbrege"] = "text",
+                ["TypGestion"] = "text",
+                ["CodIsin"] = "text",
+                ["LibValeur"] = "text",
+                ["CodOperation"] = "text",
+                ["CodMarche"] = "text",
+                ["CodAnnulation"] = "text",
+                ["Nom"] = "text",
+                ["Adr1"] = "text",
+                ["Adr2"] = "text",
+                ["Adr3"] = "text",
+                ["Adr4"] = "text",
+                ["Adr5"] = "text",
+                ["Adr6"] = "text",
+                ["AdrVille"] = "text",
+                ["CodGerant"] = "text",
+                ["CategorisationMIFID"] = "text",
+                ["LieuNegociation"] = "text"
+            };
 
-                var filterFields = new Dictionary<string, string>
+            var hasFilter = filterFields.Keys.Any(k => form.ContainsKey(k) && !string.IsNullOrWhiteSpace(form[k]));
+            if (!hasFilter)
+            {
+                TempData["Error"] = "Please select at least one filter before exporting.";
+                return RedirectToAction("Index");
+            }
+
+            var parameters = new List<SqlParameter>();
+
+            foreach (var key in filterFields.Keys)
+            {
+                var value = form[key];
+                if (!string.IsNullOrWhiteSpace(value))
                 {
-                    ["DateEffetStart"] = "date",
-                    ["DateEffetEnd"] = "date",
-                    ["DatTraitementStart"] = "date",
-                    ["DatTraitementEnd"] = "date",
-                    ["CodSens"] = "text",
-                    ["Qte"] = "number",
-                    ["Crs"] = "number",
-                    ["MntBrutDevNegociation"] = "number",
-                    ["NumCompte"] = "text",
-                    ["CodSociete"] = "text",
-                    ["CodAssiste"] = "text",
-                    ["NomAbrege"] = "text",
-                    ["TypGestion"] = "text",
-                    ["CodIsin"] = "text",
-                    ["LibValeur"] = "text",
-                    ["CodOperation"] = "text",
-                    ["CodMarche"] = "text",
-                    ["CodAnnulation"] = "text",
-                    ["Nom"] = "text",
-                    ["Adr1"] = "text",
-                    ["Adr2"] = "text",
-                    ["Adr3"] = "text",
-                    ["Adr4"] = "text",
-                    ["Adr5"] = "text",
-                    ["Adr6"] = "text",
-                    ["AdrVille"] = "text",
-                    ["CodGerant"] = "text",
-                    ["CategorisationMIFID"] = "text",
-                    ["LieuNegociation"] = "text"
-                };
-
-                var hasFilter = filterFields.Keys.Any(key =>
-                   form.ContainsKey(key) && !string.IsNullOrWhiteSpace(form[key])
-                );
-
-                if (!hasFilter)
-                {
-                    TempData["Error"] = "Please select at least one filter before exporting.";
-                    return RedirectToAction("Index");
-                }
-
-                foreach (var key in filterFields.Keys)
-                {
-                    var value = form[key];
-                    if (!string.IsNullOrEmpty(value))
+                    if (key == "DateEffetStart" && form["DateEffetEnd"].Count > 0)
                     {
-                        if (key == "DateEffetStart" && form["DateEffetEnd"].Count > 0)
+                        if (DateTime.TryParse(form["DateEffetStart"], out var start) &&
+                            DateTime.TryParse(form["DateEffetEnd"], out var end))
                         {
-                            if (DateTime.TryParse(form["DateEffetStart"], out var start) &&
-                                DateTime.TryParse(form["DateEffetEnd"], out var end))
-                            {
-                                end = end.Date.AddDays(1).AddTicks(-1);
-                                query.Append(" AND dateffet >= @DateEffetStart AND dateffet <= @DateEffetEnd");
-                                cmd.Parameters.AddWithValue("@DateEffetStart", start);
-                                cmd.Parameters.AddWithValue("@DateEffetEnd", end);
-                            }
-                        }
-                        else if (key == "DatTraitementStart" && form["DatTraitementEnd"].Count > 0)
-                        {
-                            if (DateTime.TryParse(form["DatTraitementStart"], out var start) &&
-                                DateTime.TryParse(form["DatTraitementEnd"], out var end))
-                            {
-                                end = end.Date.AddDays(1).AddTicks(-1);
-                                query.Append(" AND DatTraitement >= @DatTraitementStart AND DatTraitement <= @DatTraitementEnd");
-                                cmd.Parameters.AddWithValue("@DatTraitementStart", start);
-                                cmd.Parameters.AddWithValue("@DatTraitementEnd", end);
-                            }
-                        }
-                        else if (!key.Contains("DateEffet") && !key.Contains("DatTraitement"))
-                        {
-                            query.Append($" AND {key} = @{key}");
-                            cmd.Parameters.AddWithValue($"@{key}", value.ToString());
+                            end = end.Date.AddDays(1).AddTicks(-1);
+                            query.Append(" AND dateeffet >= @DateEffetStart AND dateeffet <= @DateEffetEnd");
+                            parameters.Add(new SqlParameter("@DateEffetStart", start));
+                            parameters.Add(new SqlParameter("@DateEffetEnd", end));
                         }
                     }
-                    _logger.LogInformation("Final Query: {Query}", query.ToString());
-
-                    foreach (SqlParameter param in cmd.Parameters)
+                    else if (key == "DatTraitementStart" && form["DatTraitementEnd"].Count > 0)
                     {
-                        _logger.LogInformation("Parameter: {Name} = {Value}", param.ParameterName, param.Value);
+                        if (DateTime.TryParse(form["DatTraitementStart"], out var start) &&
+                            DateTime.TryParse(form["DatTraitementEnd"], out var end))
+                        {
+                            end = end.Date.AddDays(1).AddTicks(-1);
+                            query.Append(" AND DatTraitement >= @DatTraitementStart AND DatTraitement <= @DatTraitementEnd");
+                            parameters.Add(new SqlParameter("@DatTraitementStart", start));
+                            parameters.Add(new SqlParameter("@DatTraitementEnd", end));
+                        }
+                    }
+                    else
+                    {
+                        query.Append($" AND {key} = @{key}");
+                        parameters.Add(new SqlParameter($"@{key}", value.ToString()));
                     }
                 }
+            }
 
-                // Allowed columns for sorting, include 'dateffet' exactly as in DB
-                var validColumns = new HashSet<string>(filterFields.Keys.Select(k => k.ToLower()))
-        {
-            "id", "dateffet" // add other columns you want to allow sorting by
-        };
+            // Add sorting
+            var validColumns = new HashSet<string>(filterFields.Keys.Select(k => k.ToLower())) { "id", "dateeffet" };
+            if (string.IsNullOrEmpty(sortColumn) || !validColumns.Contains(sortColumn.ToLower()))
+                sortColumn = "dateeffet";
+            sortDirection = sortDirection?.ToUpper() == "ASC" ? "ASC" : "DESC";
 
-                // Normalize and validate sort column
-                if (string.IsNullOrEmpty(sortColumn) || !validColumns.Contains(sortColumn.ToLower()))
+            query.Append($" ORDER BY {sortColumn} {sortDirection}");
+
+            // Add pagination
+            int offset = (page - 1) * pageSize;
+            query.Append(" OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+            parameters.Add(new SqlParameter("@Offset", offset));
+            parameters.Add(new SqlParameter("@PageSize", pageSize));
+
+            using (var conn = new SqlConnection(connectionString))
+            using (var cmd = new SqlCommand(query.ToString(), conn))
+            {
+                cmd.CommandTimeout = 180;
+                cmd.Parameters.AddRange(parameters.ToArray());
+
+                _logger.LogInformation("Export Query: {Query}", query.ToString());
+                foreach (var param in parameters)
                 {
-                    sortColumn = "dateffet"; // default sort column
+                    _logger.LogInformation("Param {Name} = {Value}", param.ParameterName, param.Value);
                 }
-
-                sortDirection = sortDirection?.ToUpper() == "ASC" ? "ASC" : "DESC";
-
-                query.Append($" ORDER BY {sortColumn} {sortDirection}");
-
-                int offset = (page - 1) * pageSize;
-                query.Append(" OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
-                cmd.Parameters.AddWithValue("@Offset", offset);
-                cmd.Parameters.AddWithValue("@PageSize", pageSize);
-
-                cmd.CommandText = query.ToString();
 
                 conn.Open();
-                using (var reader = cmd.ExecuteReader(CommandBehavior.SequentialAccess))
+                using (var reader = cmd.ExecuteReader())
                 {
-                    // Write CSV header
                     for (int i = 0; i < reader.FieldCount; i++)
                     {
                         csv.Append(reader.GetName(i));
@@ -324,7 +311,6 @@ namespace newtestextract.Controllers
                     }
                     csv.AppendLine();
 
-                    // Write CSV rows
                     while (reader.Read())
                     {
                         for (int i = 0; i < reader.FieldCount; i++)
@@ -333,7 +319,6 @@ namespace newtestextract.Controllers
                             string value = rawValue is DateTime dt
                                 ? dt.ToString("yyyy-MM-dd")
                                 : rawValue?.ToString() ?? "";
-
                             value = value.Replace("\"", "\"\"");
                             csv.Append($"\"{value}\"");
                             if (i < reader.FieldCount - 1) csv.Append(",");
