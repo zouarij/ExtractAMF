@@ -72,8 +72,16 @@ namespace newtestextract.Controllers
         }
 
         [HttpPost]
+        [HttpPost]
         public ActionResult Login(string username, string password)
         {
+            // Validate empty fields
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            {
+                ViewBag.Error = "Username and password are required.";
+                return View();
+            }
+
             using (SqlConnection conn = new SqlConnection(_connStr))
             {
                 string query = "SELECT COUNT(*) FROM Users WHERE Username = @username AND Password = @password";
