@@ -26,7 +26,7 @@ app.UseRouting();
 //********
 app.UseCookiePolicy();
 app.UseAuthorization();
-
+builder.Services.AddLogging(logging => logging.AddConsole());
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=account}/{action=login}/{id?}");

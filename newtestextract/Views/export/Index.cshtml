@@ -113,37 +113,26 @@
 
 <script>
     function toggleFilter(id) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
-    }
+        const container = document.getElementById(id);
+        const checkbox = document.getElementById("chk_" + id);
 
-    function fetchCodIsin() {
-        const input = document.getElementById("codIsinInput");
-        const value = input.value.trim();
-        const list = document.getElementById("isinSuggestions");
+        if (checkbox.checked) {
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
 
-        if (value.length === 0) {
-            list.innerHTML = "";
-            return;
-        }
-
-        fetch(`/export/SearchCodIsin?term=${encodeURIComponent(value)}`)
-            .then(res => res.json())
-            .then(data => {
-                list.innerHTML = "";
-                data.forEach(item => {
-                    const li = document.createElement("li");
-                    li.textContent = item;
-                    li.style.cursor = "pointer";
-                    li.style.padding = "5px";
-                    li.onclick = () => {
-                        input.value = item;
-                        list.innerHTML = "";
-                    };
-                    list.appendChild(li);
-                });
+            const inputs = container.querySelectorAll("input");
+            inputs.forEach(input => {
+                if (input.type === "checkbox" || input.type === "radio") {
+                    input.checked = false;
+                } else {
+                    input.value = "";
+                }
             });
+
+            const suggestions = container.querySelector("ul");
+            if (suggestions) suggestions.innerHTML = "";
+        }
     }
 </script>
 
