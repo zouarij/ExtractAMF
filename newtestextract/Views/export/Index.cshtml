@@ -73,38 +73,58 @@
             <!-- Buttons -->
             <button type="submit" style="margin-top:1rem; padding:0.5rem 1rem;">Show Data</button>
             <button type="submit" formaction="/export/Export" style="margin-top:1rem; padding:0.5rem 1rem;">Export CSV</button>
+            <div id="loaderOverlay" style="
+    display:none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 9999;
+    text-align: center;
+    color: white;
+    font-size: 1.5em;
+    padding-top: 20vh;
+    ">
+                <div>
+                    <div class="spinner-border" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <br />
+                    <span>Processing, this may take several minutes...</span>
+                </div>
+            </div>
             <div id="filterError" class="alert alert-danger" style="display:none;">
                 Please select at least one filter before submitting.
             </div>
         </div>
     </div>
 </form>
+<div style="width: 100%; overflow-x: auto; max-height: 600px; border: 1px solid #ccc; padding: 0.5rem;">
 
-<!-- Pagination + Table -->
-<div style="margin-top: 2rem;">
-    <div style="width: 100%; overflow:auto; max-height:600px;">
-        <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
-            Page:
-            @if (ViewBag.TotalPages != null && ViewBag.CurrentPage != null)
+    <!-- Pagination at top right -->
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+        <span style="margin-right: 10px;">Page:</span>
+        @if (ViewBag.TotalPages != null && ViewBag.CurrentPage != null)
+        {
+            for (int i = 1; i <= (int)ViewBag.TotalPages; i++)
             {
-                for (int i = 1; i <= (int)ViewBag.TotalPages; i++)
-                {
-                    var isActive = (i == (int)ViewBag.CurrentPage) ? "font-weight: bold;" : "";
+                var isActive = (i == (int)ViewBag.CurrentPage) ? "font-weight: bold; text-decoration: underline;" : "cursor: pointer;";
 
-                    <form method="post" asp-action="ShowData" style="display:inline;">
-                        <input type="hidden" name="page" value="@i" />
-                        @foreach (var key in ViewBag.FormData?.Keys ?? new string[0])
-                        {
-                            <input type="hidden" name="@key" value="@ViewBag.FormData[key]" />
-                        }
-                        <button type="submit" style="margin-left:5px; border:none; background:none; @isActive">@i</button>
-                    </form>
-                }
+                <form method="post" asp-action="ShowData" style="display:inline; margin-left:5px;">
+                    <input type="hidden" name="page" value="@i" />
+                    @* Preserve filters as hidden inputs *@
+                    @foreach (var key in ViewBag.FormData?.Keys ?? new string[0])
+                    {
+                        <input type="hidden" name="@key" value="@ViewBag.FormData[key]" />
+                    }
+                    <button type="submit" style="border:none; background:none; padding:0; margin:0; color:blue; @isActive">@i</button>
+                </form>
             }
-        </div>
+        }
+    </div>
 
-        <!-- Table -->
-        <table class="table table-bordered table-sm table-striped" style="min-width:1500px;">
+    <!-- Table scroll container -->
+    <div style="max-height: 550px; overflow: auto;">
+        <table class="table table-bordered table-sm table-striped" style="min-width: 1500px;">
             <thead>
                 <tr>
                     @foreach (var col in ViewBag.Columns as List<string>)
@@ -126,8 +146,8 @@
             </tbody>
         </table>
     </div>
-</div>
 
+</div>
 <!-- JavaScript -->
 <script>
     function toggleFilter(id) {
@@ -189,15 +209,50 @@
           if (!isAnyChecked) {
               errorBox.style.display = "block";
 
-              // Hide it after 10 seconds
+             
               setTimeout(() => {
                   errorBox.style.display = "none";
-              }, 5000); // 10000 ms = 10 seconds
+              }, 5000); 
 
-              return false; // prevent form submission
+              return false; 
           } else {
               errorBox.style.display = "none";
-              return true; // allow submission
+              return true;
           }
       }
+</script>
+<script>
+  
+     document.querySelectorAll("form button[type=submit]").forEach(button => {
+         button.addEventListener("click", function (e) {
+             const isExport = this.getAttribute("formaction")?.includes("Export");
+
+             if (isExport) {
+                 document.getElementById("loaderOverlay").style.display = "block";
+
+                 // Check every second if exportFinished cookie exists
+                 const interval = setInterval(() => {
+                     if (document.cookie.includes("exportFinished=true")) {
+                         clearInterval(interval);
+                         document.getElementById("loaderOverlay").style.display = "none";
+
+                         // Remove the cookie (optional cleanup)
+                         document.cookie = "exportFinished=;expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+                     }
+                 }, 1000);
+             }
+         });
+     });
+
+        function waitForExport() {
+        showLoader();
+
+        const interval = setInterval(() => {
+            if (document.cookie.includes("exportFinished=true")) {
+                clearInterval(interval);
+                document.getElementById("loader").style.display = "none";
+                document.cookie = "exportFinished=;expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+            }
+        }, 1000);
+    }
 </script>

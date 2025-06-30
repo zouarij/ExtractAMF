@@ -34,6 +34,7 @@ namespace newtestextract.Controllers
         [HttpPost]
         public IActionResult ShowData(IFormCollection form, int page = 1)
         {
+
             const int pageSize = 1;
             var rows = new List<List<string>>();
             var columns = new List<string>();
@@ -155,8 +156,9 @@ namespace newtestextract.Controllers
         [HttpPost]
         public async Task<IActionResult> Export(IFormCollection form, int page = 1, int pageSize = 1000, string sortColumn = null, string sortDirection = "DESC")
         {
+           
+            await Task.Delay(5000);
             string connectionString = _config.GetConnectionString("DefaultConnection");
-
             var filterFields = new Dictionary<string, string>
             {
                 ["DateEffetStart"] = "date",
@@ -218,6 +220,7 @@ namespace newtestextract.Controllers
                 cmd.Parameters.AddWithValue("@DatTraitementEnd", datTraitementEnd);
             }
 
+
             // ✅ Handle all other filters only if present & not empty
             foreach (var key in filterFields.Keys)
             {
@@ -238,8 +241,37 @@ namespace newtestextract.Controllers
             sortDirection = sortDirection?.ToUpper() == "ASC" ? "ASC" : "DESC";
             query.Append($" ORDER BY {sortColumn} {sortDirection}");
 
+            var excludedKeys = new HashSet<string>
+{
+    "__RequestVerificationToken", "page", "filters"
+};
 
+            var filtersUsed = string.Join(", ",
+                form.Keys
+                .Where(k => !excludedKeys.Contains(k))
+                .Where(k => !string.IsNullOrWhiteSpace(form[k]) && form[k] != "on") // exclude checkbox "on"
+                .Select(k => $"{k}={form[k]}"));
 
+            // 2. Get username from session (fallback if not found)
+            var username = HttpContext.Session.GetString("username") ?? "Unknown";
+
+            // 3. Insert export log
+            using (var logConn = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                logConn.Open();
+
+                string logQuery = @"
+        INSERT INTO ExportLog (Username, ExportedAt, FiltersUsed)
+        VALUES (@Username, @ExportedAt, @FiltersUsed)";
+
+                using (var cdmd = new SqlCommand(logQuery, logConn))
+                {
+                    cdmd.Parameters.AddWithValue("@Username", username);
+                    cdmd.Parameters.AddWithValue("@ExportedAt", DateTime.Now);
+                    cdmd.Parameters.AddWithValue("@FiltersUsed", filtersUsed);
+                    cdmd.ExecuteNonQuery();
+                }
+            }
             cmd.CommandText = query.ToString();
             cmd.CommandTimeout = 600;
 
@@ -270,7 +302,12 @@ namespace newtestextract.Controllers
                 }
                 await writer.WriteLineAsync();
             }
-
+            Response.Cookies.Append("exportFinished", "true", new CookieOptions
+            {
+                Expires = DateTimeOffset.UtcNow.AddMinutes(2),
+                HttpOnly = false,
+                SameSite = SameSiteMode.Lax
+            });
             await writer.FlushAsync();
             return new EmptyResult();
         }
@@ -279,4 +316,5 @@ namespace newtestextract.Controllers
 
 
     }
+
 }
