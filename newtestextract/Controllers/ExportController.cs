@@ -14,55 +14,113 @@ namespace newtestextract.Controllers
         public exportController(IConfiguration config)
         {
             _config = config;
+
         }
 
-        public IActionResult Index(int page = 1)
+        public IActionResult Index()
         {
             var user = HttpContext.Session.GetString("username");
             if (string.IsNullOrEmpty(user))
                 return RedirectToAction("Login", "Account");
 
-            const int pageSize = 1000;
-            var allRows = new List<List<string>>();
-            var columnNames = new List<string>();
+            // Prevent NullReference in View
+            ViewBag.Columns = new List<string>();
+            ViewBag.PageData = new List<List<string>>();
+            ViewBag.CurrentPage = 1;
+            ViewBag.TotalPages = 0;
+
+            return View();
+        }
+        [HttpPost]
+        public IActionResult ShowData(IFormCollection form, int page = 1)
+        {
+            const int pageSize = 1;
+            var rows = new List<List<string>>();
+            var columns = new List<string>();
+            var filters = new List<SqlParameter>();
+            var whereClause = new StringBuilder("WHERE 1=1");
+
+            // Keep this in ViewBag for pagination and input persistence
+            ViewBag.FormData = form;
+
+            // Filtering logic
+            void AddFilter(string key, string columnName)
+            {
+                if (form.ContainsKey(key) && !string.IsNullOrWhiteSpace(form[key]))
+                {
+                    whereClause.Append($" AND {columnName} = @{key}");
+                    filters.Add(new SqlParameter($"@{key}", form[key].ToString()));
+                }
+            }
+
+            AddFilter("CodIsin", "CodIsin");
+            AddFilter("CodSociete", "CodSociete");
+            AddFilter("TypGestion", "TypGestion");
+            // Add more as needed...
+
+            // Date range handling (DateEffet, DatTraitement)
+            if (DateTime.TryParse(form["DateEffetStart"], out var dateEffetStart))
+            {
+                whereClause.Append(" AND Dateffet >= @DateEffetStart");
+                filters.Add(new SqlParameter("@DateEffetStart", dateEffetStart));
+            }
+            if (DateTime.TryParse(form["DateEffetEnd"], out var dateEffetEnd))
+            {
+                dateEffetEnd = dateEffetEnd.Date.AddDays(1).AddTicks(-1);
+                whereClause.Append(" AND Dateffet <= @DateEffetEnd");
+                filters.Add(new SqlParameter("@DateEffetEnd", dateEffetEnd));
+            }
+
+            int totalRows = 0;
+            int totalPages = 0;
+            int offset = (page - 1) * pageSize;
 
             using (var conn = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
-                var cmd = new SqlCommand("SELECT * FROM TestData", conn);
                 conn.Open();
+
+                // Total rows
+                var countCmd = new SqlCommand($"SELECT COUNT(*) FROM TestData {whereClause}", conn);
+                countCmd.Parameters.AddRange(filters.Select(p => new SqlParameter(p.ParameterName, p.Value)).ToArray());
+                totalRows = (int)countCmd.ExecuteScalar();
+                totalPages = (int)Math.Ceiling(totalRows / (double)pageSize);
+
+                // Get page data
+                var query = $@"
+            SELECT * FROM TestData
+            {whereClause}
+            ORDER BY Dateffet DESC
+            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+
+                var cmd = new SqlCommand(query, conn);
+                cmd.Parameters.AddRange(filters.Select(p => new SqlParameter(p.ParameterName, p.Value)).ToArray());
+                cmd.Parameters.AddWithValue("@Offset", offset);
+                cmd.Parameters.AddWithValue("@PageSize", pageSize);
 
                 using (var reader = cmd.ExecuteReader())
                 {
                     for (int i = 0; i < reader.FieldCount; i++)
-                    {
-                        columnNames.Add(reader.GetName(i));
-                    }
+                        columns.Add(reader.GetName(i));
 
                     while (reader.Read())
                     {
                         var row = new List<string>();
                         for (int i = 0; i < reader.FieldCount; i++)
-                        {
-                            row.Add(reader[i].ToString());
-                        }
-                        allRows.Add(row);
+                            row.Add(reader[i]?.ToString() ?? "");
+                        rows.Add(row);
                     }
                 }
             }
 
-            // Pagination logic
-            int totalRows = allRows.Count;
-            int totalPages = (int)Math.Ceiling((double)totalRows / pageSize);
-            var pagedRows = allRows.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-
-            ViewBag.Columns = columnNames;
-            ViewBag.PageData = pagedRows;
-            ViewBag.TotalPages = totalPages;
+            // Pass data to view
+            ViewBag.Columns = columns;
+            ViewBag.PageData = rows;
             ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
+            ViewBag.TotalRows = totalRows;
 
-            return View();
+            return View("Index");
         }
-
         [HttpGet]
         public JsonResult SearchCodIsin(string term)
         {
@@ -180,7 +238,7 @@ namespace newtestextract.Controllers
             sortDirection = sortDirection?.ToUpper() == "ASC" ? "ASC" : "DESC";
             query.Append($" ORDER BY {sortColumn} {sortDirection}");
 
-           
+
 
             cmd.CommandText = query.ToString();
             cmd.CommandTimeout = 600;
@@ -222,70 +280,3 @@ namespace newtestextract.Controllers
 
     }
 }
-/*CREATE PROCEDURE ExportFilteredData
-    @DateEffetStart DATE = NULL,
-    @DateEffetEnd DATE = NULL,
-    @DatTraitementStart DATE = NULL,
-    @DatTraitementEnd DATE = NULL,
-    @CodSens NVARCHAR(50) = NULL,
-    @Qte FLOAT = NULL,
-    @Crs FLOAT = NULL,
-    @MntBrutDevNegociation FLOAT = NULL,
-    @NumCompte NVARCHAR(50) = NULL,
-    @CodSociete NVARCHAR(50) = NULL,
-    @CodAssiste NVARCHAR(50) = NULL,
-    @NomAbrege NVARCHAR(50) = NULL,
-    @TypGestion NVARCHAR(50) = NULL,
-    @CodIsin NVARCHAR(50) = NULL,
-    @LibValeur NVARCHAR(255) = NULL,
-    @CodOperation NVARCHAR(50) = NULL,
-    @CodMarche NVARCHAR(50) = NULL,
-    @CodAnnulation NVARCHAR(50) = NULL,
-    @Nom NVARCHAR(255) = NULL,
-    @Adr1 NVARCHAR(255) = NULL,
-    @Adr2 NVARCHAR(255) = NULL,
-    @Adr3 NVARCHAR(255) = NULL,
-    @Adr4 NVARCHAR(255) = NULL,
-    @Adr5 NVARCHAR(255) = NULL,
-    @Adr6 NVARCHAR(255) = NULL,
-    @AdrVille NVARCHAR(255) = NULL,
-    @CodGerant NVARCHAR(50) = NULL,
-    @CategorisationMIFID NVARCHAR(50) = NULL,
-    @LieuNegociation NVARCHAR(50) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-SELECT*
-FROM TestData
-    WHERE
-        (@DateEffetStart IS NULL OR DateEffet >= @DateEffetStart) AND
-        (@DateEffetEnd IS NULL OR DateEffet <= @DateEffetEnd) AND
-        (@DatTraitementStart IS NULL OR DatTraitement >= @DatTraitementStart) AND
-        (@DatTraitementEnd IS NULL OR DatTraitement <= @DatTraitementEnd) AND
-        (@CodSens IS NULL OR CodSens = @CodSens) AND
-        (@Qte IS NULL OR Qte = @Qte) AND
-        (@Crs IS NULL OR Crs = @Crs) AND
-        (@MntBrutDevNegociation IS NULL OR MntBrutDevNegociation = @MntBrutDevNegociation) AND
-        (@NumCompte IS NULL OR NumCompte = @NumCompte) AND
-        (@CodSociete IS NULL OR CodSociete = @CodSociete) AND
-        (@CodAssiste IS NULL OR CodAssiste = @CodAssiste) AND
-        (@NomAbrege IS NULL OR NomAbrege = @NomAbrege) AND
-        (@TypGestion IS NULL OR TypGestion = @TypGestion) AND
-        (@CodIsin IS NULL OR CodIsin = @CodIsin) AND
-        (@LibValeur IS NULL OR LibValeur = @LibValeur) AND
-        (@CodOperation IS NULL OR CodOperation = @CodOperation) AND
-        (@CodMarche IS NULL OR CodMarche = @CodMarche) AND
-        (@CodAnnulation IS NULL OR CodAnnulation = @CodAnnulation) AND
-        (@Nom IS NULL OR Nom = @Nom) AND
-        (@Adr1 IS NULL OR Adr1 = @Adr1) AND
-        (@Adr2 IS NULL OR Adr2 = @Adr2) AND
-        (@Adr3 IS NULL OR Adr3 = @Adr3) AND
-        (@Adr4 IS NULL OR Adr4 = @Adr4) AND
-        (@Adr5 IS NULL OR Adr5 = @Adr5) AND
-        (@Adr6 IS NULL OR Adr6 = @Adr6) AND
-        (@AdrVille IS NULL OR AdrVille = @AdrVille) AND
-        (@CodGerant IS NULL OR CodGerant = @CodGerant) AND
-        (@CategorisationMIFID IS NULL OR CategorisationMIFID = @CategorisationMIFID) AND
-        (@LieuNegociation IS NULL OR LieuNegociation = @LieuNegociation);
-END;*/
