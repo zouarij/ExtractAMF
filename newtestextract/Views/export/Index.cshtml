@@ -121,16 +121,19 @@
                 cursor: pointer;
             }
 
-    /* Table styling */
     .table-container {
         background-color: white;
         border-radius: var(--border-radius);
         box-shadow: var(--box-shadow);
-        overflow: hidden;
+        overflow: auto;
+        height: calc(100vh - 200px);
+        position: relative;
     }
 
+    /* Updated Table Styles */
     table {
-        width: 100%;
+        width: max-content;
+        min-width: 100%;
         border-collapse: collapse;
     }
 
@@ -141,11 +144,20 @@
         text-align: left;
         position: sticky;
         top: 0;
+        z-index: 10;
     }
 
     td {
         padding: 10px;
         border-bottom: 1px solid #eee;
+        white-space: nowrap;
+    }
+
+    /* Add this for better scrolling experience */
+    .table-wrapper {
+        position: relative;
+        width: 100%;
+        height: 100%;
     }
 
     tr:hover {
@@ -359,7 +371,7 @@
         </div>
 
         <!-- Table -->
-        <div class="table-container" style="height: calc(100vh - 200px);">
+        <div class="table-container">
             @if (ViewBag.PageData == null || ((List<List<string>>)ViewBag.PageData).Count == 0)
             {
                 <div style="display: flex; justify-content: center; align-items: center; height: 300px; background: white; border-radius: var(--border-radius);">
@@ -372,32 +384,32 @@
             }
             else
             {
-                <table>
-                    <thead>
-                        <tr>
-                            @foreach (var col in ViewBag.Columns as List<string>)
-                            {
-                                <th>@col</th>
-                            }
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var row in ViewBag.PageData as List<List<string>>)
-                        {
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
                             <tr>
-                                @foreach (var cell in row)
+                                @foreach (var col in ViewBag.Columns as List<string>)
                                 {
-                                    <td>@cell</td>
+                                    <th>@col</th>
                                 }
                             </tr>
-                        }
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in ViewBag.PageData as List<List<string>>)
+                            {
+                                <tr>
+                                    @foreach (var cell in row)
+                                    {
+                                        <td>@cell</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             }
         </div>
     </div>
-</div>
-
 <!-- Loader Overlay -->
 <div id="loaderOverlay" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; justify-content: center; align-items: center;">
     <div style="text-align: center; color: white;">
