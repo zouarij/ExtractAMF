@@ -8,14 +8,24 @@
 <head>
     <meta charset="UTF-8">
     <title>Login - ODDO BHF</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #C00000;
+            --primary-hover: #A00000;
+            --text: #2D3748;
+            --border: #E2E8F0;
+            --border-focus: #CBD5E0;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --transition: all 0.2s ease;
+        }
+
         body, html {
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', sans-serif;
+            font-family: 'Inter', sans-serif;
             height: 100%;
             background-color: #f5f5f5;
-            background: url('/Content/your-background.jpg') no-repeat center center;
         }
 
         .login-wrapper {
@@ -41,47 +51,87 @@
             margin-bottom: 40px;
         }
 
+            .logo img {
+                width: 120px;
+                margin-bottom: 20px;
+            }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
         label {
             font-weight: 500;
-            margin-top: 20px;
+            margin-bottom: 8px;
             display: block;
+            color: var(--text);
+            font-size: 14px;
         }
 
         input[type="text"],
         input[type="password"] {
             width: 100%;
-            padding: 10px;
-            margin-top: 5px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
+            padding: 12px 16px;
+            margin-top: 6px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 15px;
+            transition: var(--transition);
         }
 
+            input[type="text"]:focus,
+            input[type="password"]:focus {
+                outline: none;
+                border-color: var(--primary);
+                box-shadow: 0 0 0 3px rgba(192, 0, 0, 0.1);
+            }
+
         .submit-btn {
+            width: 100%;
+            padding: 12px;
             margin-top: 25px;
-            padding: 10px 20px;
-            background-color: #c00000;
+            background-color: var(--primary);
             color: white;
             border: none;
-            border-radius: 5px;
-            font-weight: bold;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 15px;
             cursor: pointer;
+            transition: var(--transition);
         }
 
             .submit-btn:hover {
-                background-color: #a00000;
+                background-color: var(--primary-hover);
+                transform: translateY(-1px);
+                box-shadow: var(--shadow);
             }
 
-        a {
+            .submit-btn:active {
+                transform: translateY(0);
+            }
+
+        .forgot-password {
             display: inline-block;
             margin-top: 15px;
-            font-size: 0.9em;
-            color: #444;
-            text-decoration: underline;
+            font-size: 14px;
+            color: #718096;
+            text-decoration: none;
+            transition: var(--transition);
         }
 
+            .forgot-password:hover {
+                color: var(--primary);
+                text-decoration: underline;
+            }
+
         .error-msg {
-            color: red;
+            color: #E53E3E;
+            font-size: 14px;
             margin-top: 15px;
+            padding: 12px;
+            background-color: #FEEBEB;
+            border-radius: 6px;
+            text-align: center;
         }
     </style>
 </head>
@@ -89,24 +139,30 @@
     <div class="login-wrapper">
         <div class="login-left">
             <div class="logo">
-                <img src="/Content/oddo-logo.png" alt="ODDO BHF" style="width: 120px; margin-bottom: 20px;" />
+                <img src="/Content/oddo-logo.png" alt="ODDO BHF" />
             </div>
 
             @using (Html.BeginForm("Login", "Account", FormMethod.Post))
             {
-                <label for="username">Nom d'utilisateur</label>
-                @Html.TextBox("username", null, new { @type = "text", @placeholder = "Nom d'utilisateur" })
+                <div class="form-group">
+                    <label for="username">Nom d'utilisateur</label>
+                    @Html.TextBox("username", null, new { @type = "text", @placeholder = "Entrez votre nom d'utilisateur" })
+                </div>
 
-                <label for="password">Mot de passe</label>
-                @Html.Password("password", new { @placeholder = "Mot de passe" })
+                <div class="form-group">
+                    <label for="password">Mot de passe</label>
+                    @Html.Password("password", null, new { @placeholder = "Entrez votre mot de passe" })
+                </div>
 
-                <a href="#">Changer mon mot de passe</a>
+                <button type="submit" class="submit-btn">SE CONNECTER</button>
 
-                <button type="submit" class="submit-btn">VALIDER</button>
+                <a href="#" class="forgot-password">Mot de passe oublié ?</a>
 
                 @if (ViewBag.Error != null)
                 {
-                    <p class="error-msg">@ViewBag.Error</p>
+                    <div class="error-msg">
+                        @ViewBag.Error
+                    </div>
                 }
             }
         </div>

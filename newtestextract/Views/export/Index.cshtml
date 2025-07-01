@@ -2,176 +2,555 @@
     ViewData["Title"] = "Export Data to CSV";
 }
 
+<style>
+    :root {
+        --primary-color: #C00000;
+        --secondary-color: #A00000;
+        --accent-color: #E53935;
+        --light-color: #f8f9fa;
+        --dark-color: #212529;
+        --success-color: #4CAF50;
+        --warning-color: #FF5252;
+        --border-radius: 8px;
+        --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        --transition: all 0.3s ease;
+    }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: var(--dark-color);
+        background-color: #f5f7fa;
+    }
+
+    /* Modern checkbox styling */
+    input[type="checkbox"] {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border: 2px solid var(--primary-color);
+        border-radius: 4px;
+        outline: none;
+        cursor: pointer;
+        vertical-align: middle;
+        position: relative;
+        margin-right: 8px;
+        transition: var(--transition);
+    }
+
+        input[type="checkbox"]:checked {
+            background-color: var(--primary-color);
+        }
+
+            input[type="checkbox"]:checked::after {
+                content: "✓";
+                position: absolute;
+                color: white;
+                font-size: 12px;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+            }
+
+    /* Button styling */
+    button, .btn {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: var(--border-radius);
+        padding: 10px 20px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: var(--transition);
+        box-shadow: var(--box-shadow);
+    }
+
+        button:hover, .btn:hover {
+            background-color: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+
+        button:active, .btn:active {
+            transform: translateY(0);
+        }
+
+    /* Form inputs */
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    select {
+        padding: 10px;
+        border: 1px solid #ced4da;
+        border-radius: var(--border-radius);
+        width: 100%;
+        transition: var(--transition);
+    }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        input[type="date"]:focus,
+        select:focus {
+            border-color: var(--accent-color);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+        }
+
+    /* Filter list styling */
+    #filterInputsContainer .filter-field {
+        background-color: white;
+        padding: 15px;
+        border-radius: var(--border-radius);
+        margin-bottom: 15px;
+        box-shadow: var(--box-shadow);
+    }
+
+    /* Autocomplete suggestions */
+    #isinSuggestions {
+        border-radius: var(--border-radius);
+        margin-top: 5px;
+        background-color: white;
+    }
+
+        #isinSuggestions li {
+            padding: 8px 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+            #isinSuggestions li:hover {
+                background-color: var(--light-color);
+                cursor: pointer;
+            }
+
+    /* Table styling */
+    .table-container {
+        background-color: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        overflow: hidden;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 12px;
+        text-align: left;
+        position: sticky;
+        top: 0;
+    }
+
+    td {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+    }
+
+    tr:hover {
+        background-color: rgba(72, 149, 239, 0.1);
+    }
+
+    /* Pagination */
+    .pagination {
+        display: flex;
+        gap: 5px;
+    }
+
+        .pagination button {
+            min-width: 36px;
+            padding: 6px;
+        }
+
+            .pagination button[style*="font-weight: bold"] {
+                background-color: var(--secondary-color);
+            }
+
+    /* Alert boxes */
+    .alert {
+        padding: 12px;
+        border-radius: var(--border-radius);
+    }
+
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    /* Loader overlay */
+    #loaderOverlay {
+        background-color: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .spinner-border {
+        color: var(--accent-color);
+    }
+
+    /* Layout improvements */
+    .three-column-layout {
+        display: flex;
+        gap: 25px;
+        min-height: 100vh;
+        padding: 25px;
+    }
+
+    .filter-column {
+        width: 280px;
+        background-color: white;
+        padding: 20px;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+    }
+
+    .filter-inputs-column {
+        width: 380px;
+        background-color: white;
+        padding: 20px;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+    }
+
+    .table-column {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .data-notice {
+        background-color: #e2f0fd;
+        padding: 10px 15px;
+        border-radius: var(--border-radius);
+        margin-bottom: 15px;
+        font-size: 0.9em;
+        color: var(--dark-color);
+        border-left: 4px solid var(--accent-color);
+    }
+</style>
+
 @if (TempData["Error"] != null)
 {
     <div class="alert alert-danger">@TempData["Error"]</div>
 }
 
-<h2>Export to CSV</h2>
-
-<form asp-action="ShowData" method="post" onsubmit="return validateFilters()">
-
-    <input type="hidden" name="page" value="@ViewBag.CurrentPage" />
-
-    <div style="display: flex; align-items: flex-start; gap: 2rem;">
-
-        <!-- Sidebar: Filter Checkboxes -->
-        <div style="width: 250px; border-right: 1px solid #ccc; padding-right: 1rem;">
-            <h4>Available Filters</h4>
-            @{
-                var fields = new[] {
-                    "DatTraitement", "DateEffet", "CodSens", "Qte", "Crs", "MntBrutDevNegociation", "NumCompte", "CodSociete",
-                    "CodAssiste", "NomAbrege", "TypGestion", "CodIsin", "LibValeur", "CodOperation", "CodMarche",
-                    "CodAnnulation", "Nom", "Adr1", "Adr2", "Adr3", "Adr4", "Adr5", "Adr6", "AdrVille",
-                    "CodGerant", "CategorisationMIFID", "LieuNegociation"
-                };
-            }
+<div class="three-column-layout">
+    <!-- Column 1: Filter Checkboxes -->
+    <div class="filter-column">
+        <h2 style="color: var(--primary-color); margin-bottom: 20px;">Export to CSV</h2>
+        <h4 style="color: var(--secondary-color); margin-bottom: 15px;">Available Filters</h4>
+        @{
+            var fields = new[] {
+        "DatTraitement", "DateEffet", "CodSens", "Qte", "Crs", "MntBrutDevNegociation", "NumCompte", "CodSociete",
+        "CodAssiste", "NomAbrege", "TypGestion", "CodIsin", "LibValeur", "CodOperation", "CodMarche",
+        "CodAnnulation", "Nom", "Adr1", "Adr2", "Adr3", "Adr4", "Adr5", "Adr6", "AdrVille",
+        "CodGerant", "CategorisationMIFID", "LieuNegociation"
+        };
+        }
+        <div style="max-height: calc(100vh - 200px); overflow-y: auto;">
             @foreach (var field in fields)
             {
-                <div style="margin-bottom: 8px;">
-                    <input type="checkbox" id="chk_@field" name="filters"  onclick="toggleFilter('@field')" @((!string.IsNullOrEmpty(ViewBag.FormData?[field]?.ToString()) ? "checked" : ""))) />
-                    <label for="chk_@field">@field</label>
+                <div style="margin-bottom: 10px; display: flex; align-items: center;">
+                    <input type="checkbox" id="chk_@field" name="filters" onclick="toggleFilter('@field')"
+                    @((!string.IsNullOrEmpty(ViewBag.FormData?[field]?.ToString()) ? "checked" : "")) />
+                    <label for="chk_@field" style="cursor: pointer; user-select: none;">@field</label>
                 </div>
             }
-        </div>
-
-        <!-- Main Filters -->
-        <div style="flex-grow: 1;">
-            <!-- Date Ranges -->
-            <div id="DatTraitement" class="filter-field" style="display:none; margin-bottom:1rem;">
-                <label><b>DatTraitement:</b></label><br />
-                From: <input type="date" name="DatTraitementStart" value="@(ViewBag.FormData?["DatTraitementStart"] ?? "")" />
-                To: <input type="date" name="DatTraitementEnd" value="@(ViewBag.FormData?["DatTraitementEnd"] ?? "")" />
-            </div>
-
-            <div id="DateEffet" class="filter-field" style="display:none; margin-bottom:1rem;">
-                <label><b>DateEffet:</b></label><br />
-                From: <input type="date" name="DateEffetStart" value="@(ViewBag.FormData?["DateEffetStart"] ?? "")" />
-                To: <input type="date" name="DateEffetEnd" value="@(ViewBag.FormData?["DateEffetEnd"] ?? "")" />
-            </div>
-
-            <!-- CodIsin Autocomplete -->
-            <div id="CodIsin" class="filter-field" style="display:none; margin-bottom:1rem;">
-                <label><b>CodIsin (Search):</b></label><br />
-                <input type="text" id="codIsinInput" name="CodIsin" oninput="fetchCodIsin()" autocomplete="off" style="width:300px;" value="@(ViewBag.FormData?["CodIsin"] ?? "")" />
-                <ul id="isinSuggestions" style="list-style:none; padding-left:0; max-height:150px; overflow-y:auto; border:1px solid #ccc; margin-top:5px;"></ul>
-            </div>
-
-            <!-- Other Filters -->
-            @{
-                string[] numberFields = { "Qte", "Crs", "MntBrutDevNegociation" };
-                foreach (var field in fields)
-                {
-                    if (field == "DatTraitement" || field == "DateEffet" || field == "CodIsin") continue;
-                    <div id="@field" class="filter-field" style="display:none; margin-bottom:1rem;">
-                        <label><b>@field:</b></label><br />
-                        <input type="@(numberFields.Contains(field) ? "number" : "text")" name="@field" style="width:300px;" value="@(ViewBag.FormData?[field] ?? "")" />
-                    </div>
-                }
-            }
-
-            <!-- Buttons -->
-            <button type="submit" style="margin-top:1rem; padding:0.5rem 1rem;">Show Data</button>
-            <button type="submit" formaction="/export/Export" style="margin-top:1rem; padding:0.5rem 1rem;">Export CSV</button>
-            <div id="loaderOverlay" style="
-    display:none;
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 9999;
-    text-align: center;
-    color: white;
-    font-size: 1.5em;
-    padding-top: 20vh;
-    ">
-                <div>
-                    <div class="spinner-border" role="status" style="width: 3rem; height: 3rem;">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <br />
-                    <span>Processing, this may take several minutes...</span>
-                </div>
-            </div>
-            <div id="filterError" class="alert alert-danger" style="display:none;">
-                Please select at least one filter before submitting.
-            </div>
         </div>
     </div>
-</form>
-<div style="width: 100%; overflow-x: auto; max-height: 600px; border: 1px solid #ccc; padding: 0.5rem;">
 
-    <!-- Pagination at top right -->
-    <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
-        <span style="margin-right: 10px;">Page:</span>
-        @if (ViewBag.TotalPages != null && ViewBag.CurrentPage != null)
-        {
-            for (int i = 1; i <= (int)ViewBag.TotalPages; i++)
+    <!-- Column 2: Filter Input Fields -->
+    <div class="filter-inputs-column">
+        <form asp-action="ShowData" method="post" onsubmit="return validateFilters()" id="dataForm">
+            <input type="hidden" name="page" value="@ViewBag.CurrentPage" />
+
+            <!-- Buttons at the TOP of the filter inputs -->
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button type="submit" class="btn">
+                    <i class="fas fa-eye"></i> Show Data
+                </button>
+                <button type="submit" formaction="/export/Export" class="btn" style="background-color: var(--success-color);">
+                    <i class="fas fa-file-export"></i> Export CSV
+                </button>
+            </div>
+            <div id="filterError" class="alert alert-danger" style="display:none; margin-bottom: 15px;"></div>
+
+            <!-- Filter inputs will appear below buttons -->
+            <div id="filterInputsContainer" style="max-height: calc(100vh - 250px); overflow-y: auto;">
+                <!-- Date Ranges -->
+                <div id="DatTraitement" class="filter-field" style="display:none;">
+                    <label style="font-weight: 600; color: var(--secondary-color); margin-bottom: 8px; display: block;">DatTraitement</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-size: 0.9em;">From</label>
+                            <input type="date" name="DatTraitementStart" value="@(ViewBag.FormData?["DatTraitementStart"] ?? "")" />
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-size: 0.9em;">To</label>
+                            <input type="date" name="DatTraitementEnd" value="@(ViewBag.FormData?["DatTraitementEnd"] ?? "")" />
+                        </div>
+                    </div>
+                </div>
+
+                <div id="DateEffet" class="filter-field" style="display:none;">
+                    <label style="font-weight: 600; color: var(--secondary-color); margin-bottom: 8px; display: block;">DateEffet</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-size: 0.9em;">From</label>
+                            <input type="date" name="DateEffetStart" value="@(ViewBag.FormData?["DateEffetStart"] ?? "")" />
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-size: 0.9em;">To</label>
+                            <input type="date" name="DateEffetEnd" value="@(ViewBag.FormData?["DateEffetEnd"] ?? "")" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CodIsin Autocomplete -->
+                <div id="CodIsin" class="filter-field" style="display:none;">
+                    <label style="font-weight: 600; color: var(--secondary-color); margin-bottom: 8px; display: block;">CodIsin (Search)</label>
+                    <input type="text" id="codIsinInput" name="CodIsin" oninput="fetchCodIsin()" autocomplete="off" placeholder="Start typing to search..." value="@(ViewBag.FormData?["CodIsin"] ?? "")" />
+                    <ul id="isinSuggestions"></ul>
+                </div>
+
+                <!-- Other Filters -->
+                @{
+                    string[] numberFields = { "Qte", "Crs", "MntBrutDevNegociation" };
+                    foreach (var field in fields)
+                    {
+                        if (field == "DatTraitement" || field == "DateEffet" || field == "CodIsin") continue;
+                        <div id="@field" class="filter-field" style="display:none;">
+                            <label style="font-weight: 600; color: var(--secondary-color); margin-bottom: 8px; display: block;">@field</label>
+                            <input type="@(numberFields.Contains(field) ? "number" : "text")" name="@field" value="@(ViewBag.FormData?[field] ?? "")" />
+                        </div>
+                    }
+                }
+            </div>
+        </form>
+    </div>
+
+    <!-- Column 3: Table and Pagination -->
+    <div class="table-column">
+        <!-- Pagination -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <div class="data-notice">
+                <i class="fas fa-info-circle"></i> Note: This table displays only the first 1000 rows of matching data
+            </div>
+            <div class="pagination">
+                <span style="margin-right: 10px;">Page:</span>
+                @if (ViewBag.TotalPages != null && ViewBag.CurrentPage != null)
+                {
+                    for (int i = 1; i <= (int)ViewBag.TotalPages; i++)
+                    {
+                        var isActive = (i == (int)ViewBag.CurrentPage) ? "font-weight: bold; text-decoration: underline;" : "";
+                        <form method="post" asp-action="ShowData" style="display:inline;">
+                            <input type="hidden" name="page" value="@i" />
+                            @foreach (var key in ViewBag.FormData?.Keys ?? new string[0])
+                            {
+                                <input type="hidden" name="@key" value="@ViewBag.FormData[key]" />
+                            }
+                            <button type="submit" class="btn" style="@isActive padding: 6px 10px; min-width: 36px;">@i</button>
+                        </form>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-container" style="height: calc(100vh - 200px);">
+            @if (ViewBag.PageData == null || ((List<List<string>>)ViewBag.PageData).Count == 0)
             {
-                var isActive = (i == (int)ViewBag.CurrentPage) ? "font-weight: bold; text-decoration: underline;" : "cursor: pointer;";
-
-                <form method="post" asp-action="ShowData" style="display:inline; margin-left:5px;">
-                    <input type="hidden" name="page" value="@i" />
-                    @* Preserve filters as hidden inputs *@
-                    @foreach (var key in ViewBag.FormData?.Keys ?? new string[0])
-                    {
-                        <input type="hidden" name="@key" value="@ViewBag.FormData[key]" />
-                    }
-                    <button type="submit" style="border:none; background:none; padding:0; margin:0; color:blue; @isActive">@i</button>
-                </form>
+                <div style="display: flex; justify-content: center; align-items: center; height: 300px; background: white; border-radius: var(--border-radius);">
+                    <div style="text-align: center; color: #666;">
+                        <i class="fas fa-database" style="font-size: 2em; color: #ccc; margin-bottom: 15px;"></i>
+                        <div style="font-size: 1.2em; margin-bottom: 10px;">No data to display</div>
+                        <div>Please select filters and click "Show Data"</div>
+                    </div>
+                </div>
             }
-        }
-    </div>
-
-    <!-- Table scroll container -->
-    <div style="max-height: 550px; overflow: auto;">
-        <table class="table table-bordered table-sm table-striped" style="min-width: 1500px;">
-            <thead>
-                <tr>
-                    @foreach (var col in ViewBag.Columns as List<string>)
-                    {
-                        <th>@col</th>
-                    }
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var row in ViewBag.PageData as List<List<string>>)
-                {
-                    <tr>
-                        @foreach (var cell in row)
+            else
+            {
+                <table>
+                    <thead>
+                        <tr>
+                            @foreach (var col in ViewBag.Columns as List<string>)
+                            {
+                                <th>@col</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in ViewBag.PageData as List<List<string>>)
                         {
-                            <td>@cell</td>
+                            <tr>
+                                @foreach (var cell in row)
+                                {
+                                    <td>@cell</td>
+                                }
+                            </tr>
                         }
-                    </tr>
-                }
-            </tbody>
-        </table>
+                    </tbody>
+                </table>
+            }
+        </div>
     </div>
-
 </div>
+
+<!-- Loader Overlay -->
+<div id="loaderOverlay" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; justify-content: center; align-items: center;">
+    <div style="text-align: center; color: white;">
+        <div class="spinner-border" role="status" style="width: 3rem; height: 3rem; color: #4895ef;"></div>
+        <h3 style="margin-top: 20px;">Processing your request</h3>
+        <p style="color: rgba(255,255,255,0.8);">This may take several minutes...</p>
+    </div>
+</div>
+<!-- Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
 <!-- JavaScript -->
 <script>
-    function toggleFilter(id) {
+       // Main filter management functions
+    function toggleFilter(id, forceShow = false) {
         const container = document.getElementById(id);
         const checkbox = document.getElementById("chk_" + id);
-        if (checkbox.checked) {
+
+        if (checkbox.checked || forceShow) {
             container.style.display = 'block';
         } else {
             container.style.display = 'none';
-            const inputs = container.querySelectorAll("input");
-            inputs.forEach(input => input.value = "");
-            const suggestions = container.querySelector("ul");
-            if (suggestions) suggestions.innerHTML = "";
+            if (!forceShow) {
+                clearFilterInputs(container);
+            }
         }
     }
 
-    // Show pre-selected filters on page load
-      window.onload = function () {
-        document.querySelectorAll("input[type='checkbox']").forEach(cb => {
-            if (cb.checked) {
-                toggleFilter(cb.id.replace("chk_", ""));
+    function clearFilterInputs(container) {
+        const inputs = container.querySelectorAll("input");
+        inputs.forEach(input => {
+            if (input.type !== 'hidden') input.value = "";
+        });
+        const suggestions = container.querySelector("ul");
+        if (suggestions) suggestions.innerHTML = "";
+    }
+
+    // Initialize all filters on page load
+    function initializeFilters() {
+        document.querySelectorAll("input[type='checkbox'][id^='chk_']").forEach(cb => {
+            if (cb.checked) toggleFilter(cb.id.replace("chk_", ""), true);
+            cb.addEventListener('change', function() {
+                toggleFilter(this.id.replace("chk_", ""));
+            });
+        });
+    }
+
+    // Form validation with filter persistence
+    function validateFilters() {
+        const checkboxes = document.querySelectorAll("input[type='checkbox'][id^='chk_']:checked");
+        if (checkboxes.length === 0) {
+            showFilterError("Please select at least one filter before submitting.");
+            return false;
+        }
+
+        let hasFilterValue = false;
+        document.querySelectorAll(".filter-field").forEach(filterDiv => {
+            if (filterDiv.style.display !== 'none') {
+                const inputs = filterDiv.querySelectorAll("input[type='text'], input[type='number'], input[type='date']");
+                inputs.forEach(input => {
+                    if (input.value.trim() !== "") hasFilterValue = true;
+                });
             }
         });
-    };
+
+        if (!hasFilterValue) {
+            showFilterError("Please fill in at least one filter field before submitting.");
+            return false;
+        }
+
+        storeVisibleFilters();
+        return true;
+    }
+
+    function showFilterError(message) {
+        const errorBox = document.getElementById("filterError");
+        errorBox.textContent = message;
+        errorBox.style.display = "block";
+        setTimeout(() => errorBox.style.display = "none", 5000);
+    }
+
+    // Filter state persistence
+    function storeVisibleFilters() {
+        const visibleFilters = [];
+        document.querySelectorAll('.filter-field').forEach(filter => {
+            if (filter.style.display !== 'none') visibleFilters.push(filter.id);
+        });
+        sessionStorage.setItem('visibleFilters', JSON.stringify(visibleFilters));
+    }
+
+    function restoreVisibleFilters() {
+        const visibleFilters = JSON.parse(sessionStorage.getItem('visibleFilters') || '[]');
+        visibleFilters.forEach(filterId => {
+            const checkbox = document.getElementById('chk_' + filterId);
+            if (checkbox) {
+                checkbox.checked = true;
+                toggleFilter(filterId, true);
+            }
+        });
+        sessionStorage.removeItem('visibleFilters');
+    }
+
+    // Show loader for both Show Data and Export actions
+    function setupFormHandlers() {
+        // First ensure loader is hidden on initialization
+        document.getElementById("loaderOverlay").style.display = "none";
+
+        document.getElementById('dataForm').addEventListener('submit', function(e) {
+            if (validateFilters()) {
+                showLoader();
+            }
+        });
+    }
+
+    function showLoader() {
+        const loader = document.getElementById("loaderOverlay");
+        // Reset loader styles to ensure proper positioning
+        loader.style.position = "fixed";
+        loader.style.top = "0";
+        loader.style.left = "0";
+        loader.style.width = "100%";
+        loader.style.height = "100%";
+        loader.style.display = "flex";
+        loader.style.justifyContent = "center";
+        loader.style.alignItems = "center";
+        loader.style.zIndex = "9999";
+        loader.style.backgroundColor = "rgba(0,0,0,0.7)";
+        loader.style.color = "white";
+
+        // Hide loader when page reloads (for Show Data)
+        window.addEventListener('load', function() {
+            document.getElementById("loaderOverlay").style.display = "none";
+        });
+
+        // For Export, check cookie as before
+        const exportButton = document.querySelector('button[formaction*="Export"]');
+        if (exportButton && document.activeElement === exportButton) {
+            const interval = setInterval(() => {
+                if (document.cookie.includes("exportFinished=true")) {
+                    clearInterval(interval);
+                    document.getElementById("loaderOverlay").style.display = "none";
+                    document.cookie = "exportFinished=;expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+                }
+            }, 1000);
+        }
+    }
+
+    // CodIsin autocomplete
+    function setupCodIsinAutocomplete() {
+        const codIsinInput = document.getElementById("codIsinInput");
+        if (codIsinInput) codIsinInput.addEventListener("input", fetchCodIsin);
+    }
+
     function fetchCodIsin() {
         const term = document.getElementById("codIsinInput").value;
         const suggestions = document.getElementById("isinSuggestions");
@@ -185,74 +564,28 @@
                 data.forEach(item => {
                     const li = document.createElement("li");
                     li.textContent = item;
-                    li.onclick = () => {
+                    li.style.padding = "8px 12px";
+                    li.style.borderBottom = "1px solid #eee";
+                    li.style.transition = "background-color 0.2s";
+                    li.addEventListener("mouseenter", () => li.style.backgroundColor = "#f8f9fa");
+                    li.addEventListener("mouseleave", () => li.style.backgroundColor = "");
+                    li.addEventListener("click", () => {
                         document.getElementById("codIsinInput").value = item;
                         suggestions.innerHTML = "";
-                    };
+                    });
                     suggestions.appendChild(li);
                 });
             });
-
     }
-    function validateFilters() {
-          const checkboxes = document.querySelectorAll("input[type='checkbox'][id^='chk_']");
-          let isAnyChecked = false;
 
-          checkboxes.forEach(cb => {
-              if (cb.checked) {
-                  isAnyChecked = true;
-              }
-          });
+    // Initialize everything when DOM is loaded
+    document.addEventListener("DOMContentLoaded", function() {
+        // Ensure loader is hidden on page load
+        document.getElementById("loaderOverlay").style.display = "none";
 
-          const errorBox = document.getElementById("filterError");
-
-          if (!isAnyChecked) {
-              errorBox.style.display = "block";
-
-             
-              setTimeout(() => {
-                  errorBox.style.display = "none";
-              }, 5000); 
-
-              return false; 
-          } else {
-              errorBox.style.display = "none";
-              return true;
-          }
-      }
-</script>
-<script>
-  
-     document.querySelectorAll("form button[type=submit]").forEach(button => {
-         button.addEventListener("click", function (e) {
-             const isExport = this.getAttribute("formaction")?.includes("Export");
-
-             if (isExport) {
-                 document.getElementById("loaderOverlay").style.display = "block";
-
-                 // Check every second if exportFinished cookie exists
-                 const interval = setInterval(() => {
-                     if (document.cookie.includes("exportFinished=true")) {
-                         clearInterval(interval);
-                         document.getElementById("loaderOverlay").style.display = "none";
-
-                         // Remove the cookie (optional cleanup)
-                         document.cookie = "exportFinished=;expires=Thu, 01 Jan 1970 00:00:01 GMT;";
-                     }
-                 }, 1000);
-             }
-         });
-     });
-
-        function waitForExport() {
-        showLoader();
-
-        const interval = setInterval(() => {
-            if (document.cookie.includes("exportFinished=true")) {
-                clearInterval(interval);
-                document.getElementById("loader").style.display = "none";
-                document.cookie = "exportFinished=;expires=Thu, 01 Jan 1970 00:00:01 GMT;";
-            }
-        }, 1000);
-    }
+        initializeFilters();
+        setupFormHandlers();
+        setupCodIsinAutocomplete();
+        restoreVisibleFilters();
+    });
 </script>

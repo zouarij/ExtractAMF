@@ -308,7 +308,7 @@ namespace newtestextract.Controllers
                 HttpOnly = false,
                 SameSite = SameSiteMode.Lax
             });
-            await writer.FlushAsync();
+            await writer.FlushAsync(); 
             return new EmptyResult();
         }
 
