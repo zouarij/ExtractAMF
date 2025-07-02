@@ -156,8 +156,9 @@ namespace newtestextract.Controllers
         [HttpPost]
         public async Task<IActionResult> Export(IFormCollection form, int page = 1, int pageSize = 1000, string sortColumn = null, string sortDirection = "DESC")
         {
-           
+            // Simulate delay (remove in production)
             await Task.Delay(5000);
+
             string connectionString = _config.GetConnectionString("DefaultConnection");
             var filterFields = new Dictionary<string, string>
             {
@@ -192,11 +193,12 @@ namespace newtestextract.Controllers
                 ["LieuNegociation"] = "text"
             };
 
+            // Build query and parameters
             var query = new StringBuilder("SELECT * FROM dbo.TestData WHERE 1=1");
             using var conn = new SqlConnection(connectionString);
             using var cmd = new SqlCommand { Connection = conn };
 
-            // ✅ Handle special date filters safely
+            // Handle date filters
             if (form.ContainsKey("DateEffetStart") && DateTime.TryParse(form["DateEffetStart"], out var dateEffetStart))
             {
                 query.Append(" AND dateffet >= @DateEffetStart");
@@ -220,12 +222,10 @@ namespace newtestextract.Controllers
                 cmd.Parameters.AddWithValue("@DatTraitementEnd", datTraitementEnd);
             }
 
-
-            // ✅ Handle all other filters only if present & not empty
+            // Handle other filters
             foreach (var key in filterFields.Keys)
             {
                 if (key.Contains("Start") || key.Contains("End")) continue;
-
                 if (form.ContainsKey(key) && !string.IsNullOrWhiteSpace(form[key]))
                 {
                     query.Append($" AND {key} = @{key}");
@@ -233,57 +233,52 @@ namespace newtestextract.Controllers
                 }
             }
 
-            // ✅ Sorting
+            // Sorting
             var validColumns = new HashSet<string>(filterFields.Keys.Select(k => k.ToLower())) { "id", "dateffet" };
             if (string.IsNullOrEmpty(sortColumn) || !validColumns.Contains(sortColumn.ToLower()))
                 sortColumn = "dateffet";
-
             sortDirection = sortDirection?.ToUpper() == "ASC" ? "ASC" : "DESC";
             query.Append($" ORDER BY {sortColumn} {sortDirection}");
 
-            var excludedKeys = new HashSet<string>
-{
-    "__RequestVerificationToken", "page", "filters"
-};
+            // Pagination
+            int offset = (page - 1) * pageSize;
+            query.Append($" OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY");
 
+            // Log export
+            var username = HttpContext.Session.GetString("username") ?? "Unknown";
+            var excludedKeys = new HashSet<string> { "__RequestVerificationToken", "page", "filters" };
             var filtersUsed = string.Join(", ",
                 form.Keys
-                .Where(k => !excludedKeys.Contains(k))
-                .Where(k => !string.IsNullOrWhiteSpace(form[k]) && form[k] != "on") // exclude checkbox "on"
-                .Select(k => $"{k}={form[k]}"));
+                    .Where(k => !excludedKeys.Contains(k) && !string.IsNullOrWhiteSpace(form[k]) && form[k] != "on")
+                    .Select(k => $"{k}={form[k]}"));
 
-            // 2. Get username from session (fallback if not found)
-            var username = HttpContext.Session.GetString("username") ?? "Unknown";
-
-            // 3. Insert export log
             using (var logConn = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
-                logConn.Open();
-
+                await logConn.OpenAsync();
                 string logQuery = @"
-        INSERT INTO ExportLog (Username, ExportedAt, FiltersUsed)
-        VALUES (@Username, @ExportedAt, @FiltersUsed)";
-
-                using (var cdmd = new SqlCommand(logQuery, logConn))
+            INSERT INTO ExportLog (Username, ExportedAt, FiltersUsed)
+            VALUES (@Username, @ExportedAt, @FiltersUsed)";
+                using (var logCmd = new SqlCommand(logQuery, logConn))
                 {
-                    cdmd.Parameters.AddWithValue("@Username", username);
-                    cdmd.Parameters.AddWithValue("@ExportedAt", DateTime.Now);
-                    cdmd.Parameters.AddWithValue("@FiltersUsed", filtersUsed);
-                    cdmd.ExecuteNonQuery();
+                    logCmd.Parameters.AddWithValue("@Username", username);
+                    logCmd.Parameters.AddWithValue("@ExportedAt", DateTime.Now);
+                    logCmd.Parameters.AddWithValue("@FiltersUsed", filtersUsed);
+                    await logCmd.ExecuteNonQueryAsync();
                 }
             }
-            cmd.CommandText = query.ToString();
-            cmd.CommandTimeout = 600;
 
-            // ✅ Prepare HTTP response
+            // Set up HTTP response
             Response.ContentType = "text/csv";
             Response.Headers.Add("Content-Disposition", $"attachment; filename=export_page{page}.csv");
-
-            await conn.OpenAsync();
-            await using var reader = await cmd.ExecuteReaderAsync();
             await using var writer = new StreamWriter(Response.Body, Encoding.UTF8, bufferSize: 65536, leaveOpen: true);
 
-            // ✅ Write header
+            // Execute query and process in chunks
+            cmd.CommandText = query.ToString();
+            cmd.CommandTimeout = 600;
+            await conn.OpenAsync();
+            await using var reader = await cmd.ExecuteReaderAsync();
+
+            // Write header
             for (int i = 0; i < reader.FieldCount; i++)
             {
                 await writer.WriteAsync(reader.GetName(i));
@@ -291,25 +286,62 @@ namespace newtestextract.Controllers
             }
             await writer.WriteLineAsync();
 
-            // ✅ Stream rows
+            // Process data in chunks
+            const int chunkSize = 100; // Adjust based on testing
+            var chunk = new List<string[]>(chunkSize);
             while (await reader.ReadAsync())
             {
+                var row = new string[reader.FieldCount];
                 for (int i = 0; i < reader.FieldCount; i++)
                 {
-                    var value = reader[i]?.ToString()?.Replace("\"", "\"\"") ?? "";
-                    await writer.WriteAsync($"\"{value}\"");
-                    if (i < reader.FieldCount - 1) await writer.WriteAsync(",");
+                    row[i] = reader[i]?.ToString()?.Replace("\"", "\"\"") ?? "";
                 }
-                await writer.WriteLineAsync();
+                chunk.Add(row);
+
+                if (chunk.Count >= chunkSize)
+                {
+                    await WriteChunkAsync(writer, chunk);
+                    chunk.Clear();
+                }
             }
+
+            // Write remaining rows
+            if (chunk.Count > 0)
+            {
+                await WriteChunkAsync(writer, chunk);
+            }
+
+            // Set cookie and finalize response
             Response.Cookies.Append("exportFinished", "true", new CookieOptions
             {
                 Expires = DateTimeOffset.UtcNow.AddMinutes(2),
                 HttpOnly = false,
                 SameSite = SameSiteMode.Lax
             });
-            await writer.FlushAsync(); 
+
+            await writer.FlushAsync();
             return new EmptyResult();
+        }
+
+        // Helper method to write a chunk of rows asynchronously
+        private async Task WriteChunkAsync(StreamWriter writer, List<string[]> chunk)
+        {
+            var tasks = chunk.Select(row => Task.Run(() =>
+            {
+                var sb = new StringBuilder();
+                for (int i = 0; i < row.Length; i++)
+                {
+                    sb.Append($"\"{row[i]}\"");
+                    if (i < row.Length - 1) sb.Append(",");
+                }
+                return sb.ToString();
+            })).ToList();
+
+            var formattedRows = await Task.WhenAll(tasks);
+            foreach (var row in formattedRows)
+            {
+                await writer.WriteLineAsync(row);
+            }
         }
 
 
