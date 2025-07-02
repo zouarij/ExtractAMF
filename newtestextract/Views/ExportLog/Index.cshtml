@@ -1,0 +1,25 @@
+﻿@model System.Data.DataTable
+
+<h2>Export Log History</h2>
+
+<table class="table table-bordered table-striped">
+    <thead>
+        <tr>
+            @foreach (System.Data.DataColumn column in Model.Columns)
+            {
+                <th>@column.ColumnName</th>
+            }
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (System.Data.DataRow row in Model.Rows)
+        {
+            <tr>
+                @foreach (var item in row.ItemArray)
+                {
+                    <td>@item</td>
+                }
+            </tr>
+        }
+    </tbody>
+</table>

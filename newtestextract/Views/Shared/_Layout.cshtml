@@ -13,9 +13,11 @@
         var controller = ViewContext.RouteData.Values["controller"]?.ToString();
         var action = ViewContext.RouteData.Values["action"]?.ToString();
         bool isLoginPage = !(controller == "account" && action == "login");
+        bool isaccessPage = !(controller == "account" && action == "accessdenied");
+
     }
 
-    @if (isLoginPage)
+    @if (isLoginPage||isaccessPage)
     {
         <header>
             <nav class="navbar navbar-expand-sm navbar-light bg-white border-bottom box-shadow mb-3">
