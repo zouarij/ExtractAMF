@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="~/newtestextract.styles.css" asp-append-version="true" />
 </head>
 <body>
+
     @{
         var controller = ViewContext.RouteData.Values["controller"]?.ToString();
         var action = ViewContext.RouteData.Values["action"]?.ToString();
@@ -35,6 +36,15 @@
                         <ul class="navbar-nav me-auto">
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                                @if (Context.Session.GetString("role") == "admin")
+                                {
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-controller="ExportLog" asp-action="index">Exports History</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-controller="account" asp-action="adduser">Add User</a>
+                                </li>
+                                }
                             </li>
                             <!-- Add more nav items if needed -->
                         </ul>
@@ -47,7 +57,8 @@
                                 <li class="nav-item">
                                     <a class="nav-link text-dark" asp-controller="Account" asp-action="Logout">Logout</a>
                                 </li>
-                            }
+                           
+                          }
                         </ul>
                     </div>
                 </div>
