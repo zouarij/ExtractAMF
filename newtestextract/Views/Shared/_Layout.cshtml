@@ -7,6 +7,58 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/newtestextract.styles.css" asp-append-version="true" />
+    <style>
+        /* Diagonal Role Indicator */
+        .navbar {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .role-indicator {
+            position: absolute;
+            width: 8px;
+            height: 150%;
+            top: -10px;
+            left: 10px;
+            transform: rotate(15deg);
+            transform-origin: top left;
+        }
+
+        .admin-indicator {
+            background: linear-gradient(135deg, #FFD700, #D4AF37);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .user-indicator {
+            background: linear-gradient(135deg, #4e8cff, #0062cc);
+        }
+
+        /* Role Badge */
+        .role-badge {
+            font-size: 0.7rem;
+            padding: 0.15rem 0.4rem;
+            margin-left: 0.5rem;
+            border-radius: 10px;
+            vertical-align: middle;
+        }
+
+        .admin-badge {
+            background: linear-gradient(135deg, #FFD700, #D4AF37);
+            color: #000;
+            font-weight: bold;
+        }
+
+        .user-badge {
+            background: linear-gradient(135deg, #4e8cff, #0062cc);
+            color: #fff;
+        }
+
+        /* Adjust navbar content positioning */
+        .navbar-content {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
 </head>
 <body>
 
@@ -15,7 +67,7 @@
         var action = ViewContext.RouteData.Values["action"]?.ToString();
         bool isLoginPage = !(controller == "account" && action == "login");
         bool isaccessPage = !(controller == "account" && action == "accessdenied");
-
+        var userRole = Context.Session.GetString("role");
     }
 
     @if (isLoginPage||isaccessPage)
@@ -51,14 +103,18 @@
                         <ul class="navbar-nav">
                             @if (Context.Session.GetString("username") != null)
                             {
-                                <li class="nav-item">
-                                    <span class="nav-link text-dark">Bonjour, @Context.Session.GetString("username")</span>
+                                <li class="nav-item d-flex align-items-center">
+                                    <span class="nav-link text-dark">
+                                        Bonjour, @Context.Session.GetString("username")
+                                        <span class="role-badge @(userRole == "admin" ? "admin-badge" : "user-badge")">
+                                            @userRole?.ToUpper()
+                                        </span>
+                                    </span>
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link text-dark" asp-controller="Account" asp-action="Logout">Logout</a>
                                 </li>
-                           
-                          }
+                            }
                         </ul>
                     </div>
                 </div>
