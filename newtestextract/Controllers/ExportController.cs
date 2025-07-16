@@ -156,9 +156,6 @@ namespace newtestextract.Controllers
         [HttpPost]
         public async Task<IActionResult> Export(IFormCollection form, int page = 1, int pageSize = 1000, string sortColumn = null, string sortDirection = "DESC")
         {
-            // Simulate delay (remove in production)
-            await Task.Delay(5000);
-
             string connectionString = _config.GetConnectionString("DefaultConnection");
             var filterFields = new Dictionary<string, string>
             {
@@ -193,43 +190,32 @@ namespace newtestextract.Controllers
                 ["LieuNegociation"] = "text"
             };
 
-            // Build query and parameters
+            // Build SQL query
             var query = new StringBuilder("SELECT * FROM dbo.TestData WHERE 1=1");
             using var conn = new SqlConnection(connectionString);
             using var cmd = new SqlCommand { Connection = conn };
 
-            // Handle date filters
-            if (form.ContainsKey("DateEffetStart") && DateTime.TryParse(form["DateEffetStart"], out var dateEffetStart))
-            {
-                query.Append(" AND dateffet >= @DateEffetStart");
-                cmd.Parameters.AddWithValue("@DateEffetStart", dateEffetStart);
-            }
-            if (form.ContainsKey("DateEffetEnd") && DateTime.TryParse(form["DateEffetEnd"], out var dateEffetEnd))
-            {
-                dateEffetEnd = dateEffetEnd.Date.AddDays(1).AddTicks(-1);
-                query.Append(" AND dateffet <= @DateEffetEnd");
-                cmd.Parameters.AddWithValue("@DateEffetEnd", dateEffetEnd);
-            }
-            if (form.ContainsKey("DatTraitementStart") && DateTime.TryParse(form["DatTraitementStart"], out var datTraitementStart))
-            {
-                query.Append(" AND DatTraitement >= @DatTraitementStart");
-                cmd.Parameters.AddWithValue("@DatTraitementStart", datTraitementStart);
-            }
-            if (form.ContainsKey("DatTraitementEnd") && DateTime.TryParse(form["DatTraitementEnd"], out var datTraitementEnd))
-            {
-                datTraitementEnd = datTraitementEnd.Date.AddDays(1).AddTicks(-1);
-                query.Append(" AND DatTraitement <= @DatTraitementEnd");
-                cmd.Parameters.AddWithValue("@DatTraitementEnd", datTraitementEnd);
-            }
-
-            // Handle other filters
+            // Handle filters
             foreach (var key in filterFields.Keys)
             {
-                if (key.Contains("Start") || key.Contains("End")) continue;
                 if (form.ContainsKey(key) && !string.IsNullOrWhiteSpace(form[key]))
                 {
-                    query.Append($" AND {key} = @{key}");
-                    cmd.Parameters.AddWithValue($"@{key}", form[key].ToString());
+                    if (filterFields[key] == "date" && DateTime.TryParse(form[key], out var dateValue))
+                    {
+                        if (key.EndsWith("Start"))
+                            query.Append($" AND {key.Replace("Start", "")} >= @{key}");
+                        else if (key.EndsWith("End"))
+                        {
+                            dateValue = dateValue.Date.AddDays(1).AddTicks(-1);
+                            query.Append($" AND {key.Replace("End", "")} <= @{key}");
+                        }
+                        cmd.Parameters.AddWithValue($"@{key}", dateValue);
+                    }
+                    else
+                    {
+                        query.Append($" AND {key} = @{key}");
+                        cmd.Parameters.AddWithValue($"@{key}", form[key].ToString());
+                    }
                 }
             }
 
@@ -244,74 +230,40 @@ namespace newtestextract.Controllers
             int offset = (page - 1) * pageSize;
             query.Append($" OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY");
 
-            // Log export
+            // Get username and filters used
             var username = HttpContext.Session.GetString("username") ?? "Unknown";
             var excludedKeys = new HashSet<string> { "__RequestVerificationToken", "page", "filters" };
             var filtersUsed = string.Join(", ",
-                form.Keys
-                    .Where(k => !excludedKeys.Contains(k) && !string.IsNullOrWhiteSpace(form[k]) && form[k] != "on")
-                    .Select(k => $"{k}={form[k]}"));
+                form.Keys.Where(k => !excludedKeys.Contains(k) && !string.IsNullOrWhiteSpace(form[k]) && form[k] != "on")
+                         .Select(k => $"{k}={form[k]}"));
 
-            using (var logConn = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            // Log export (async)
+            _ = Task.Run(async () =>
             {
-                await logConn.OpenAsync();
-                string logQuery = @"
-            INSERT INTO ExportLog (Username, ExportedAt, FiltersUsed)
-            VALUES (@Username, @ExportedAt, @FiltersUsed)";
-                using (var logCmd = new SqlCommand(logQuery, logConn))
+                try
                 {
+                    using var logConn = new SqlConnection(connectionString);
+                    await logConn.OpenAsync();
+                    string logQuery = @"
+                INSERT INTO ExportLog (Username, ExportedAt, FiltersUsed)
+                VALUES (@Username, @ExportedAt, @FiltersUsed)";
+                    using var logCmd = new SqlCommand(logQuery, logConn);
                     logCmd.Parameters.AddWithValue("@Username", username);
                     logCmd.Parameters.AddWithValue("@ExportedAt", DateTime.Now);
                     logCmd.Parameters.AddWithValue("@FiltersUsed", filtersUsed);
                     await logCmd.ExecuteNonQueryAsync();
                 }
-            }
+                catch (Exception ex)
+                {
+                    // Optionally log error
+                }
+            });
 
-            // Set up HTTP response
+            // Set up CSV response
             Response.ContentType = "text/csv";
             Response.Headers.Add("Content-Disposition", $"attachment; filename=export_page{page}.csv");
-            await using var writer = new StreamWriter(Response.Body, Encoding.UTF8, bufferSize: 65536, leaveOpen: true);
 
-            // Execute query and process in chunks
-            cmd.CommandText = query.ToString();
-            cmd.CommandTimeout = 600;
-            await conn.OpenAsync();
-            await using var reader = await cmd.ExecuteReaderAsync();
-
-            // Write header
-            for (int i = 0; i < reader.FieldCount; i++)
-            {
-                await writer.WriteAsync(reader.GetName(i));
-                if (i < reader.FieldCount - 1) await writer.WriteAsync(",");
-            }
-            await writer.WriteLineAsync();
-
-            // Process data in chunks
-            const int chunkSize = 100; // Adjust based on testing
-            var chunk = new List<string[]>(chunkSize);
-            while (await reader.ReadAsync())
-            {
-                var row = new string[reader.FieldCount];
-                for (int i = 0; i < reader.FieldCount; i++)
-                {
-                    row[i] = reader[i]?.ToString()?.Replace("\"", "\"\"") ?? "";
-                }
-                chunk.Add(row);
-
-                if (chunk.Count >= chunkSize)
-                {
-                    await WriteChunkAsync(writer, chunk);
-                    chunk.Clear();
-                }
-            }
-
-            // Write remaining rows
-            if (chunk.Count > 0)
-            {
-                await WriteChunkAsync(writer, chunk);
-            }
-
-            // Set cookie and finalize response
+            // Append export finished cookie (will stay even if download is cancelled early)
             Response.Cookies.Append("exportFinished", "true", new CookieOptions
             {
                 Expires = DateTimeOffset.UtcNow.AddMinutes(2),
@@ -319,34 +271,77 @@ namespace newtestextract.Controllers
                 SameSite = SameSiteMode.Lax
             });
 
-            await writer.FlushAsync();
+            cmd.CommandText = query.ToString();
+            cmd.CommandTimeout = 600;
+
+            await conn.OpenAsync();
+            await using var reader = await cmd.ExecuteReaderAsync();
+
+            try
+            {
+                await using var writer = new StreamWriter(Response.Body, Encoding.UTF8, bufferSize: 65536, leaveOpen: true);
+
+                // Write CSV header
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    await writer.WriteAsync(reader.GetName(i));
+                    if (i < reader.FieldCount - 1) await writer.WriteAsync(",");
+                }
+                await writer.WriteLineAsync();
+
+                // Process data in chunks
+                const int chunkSize = 100;
+                var chunk = new List<string[]>(chunkSize);
+
+                while (await reader.ReadAsync())
+                {
+                    var row = new string[reader.FieldCount];
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        row[i] = reader[i]?.ToString()?.Replace("\"", "\"\"") ?? "";
+                    }
+
+                    chunk.Add(row);
+
+                    if (chunk.Count >= chunkSize)
+                    {
+                        await WriteChunkAsync(writer, chunk);
+                        chunk.Clear();
+                    }
+                }
+
+                if (chunk.Count > 0)
+                    await WriteChunkAsync(writer, chunk);
+
+                await writer.FlushAsync();
+            }
+            catch (IOException ex)
+            {
+                // Handle client disconnect / file deletion gracefully
+                // Example: Client canceled the download => IOException
+                // You can log this if needed but no need to crash
+            }
+
             return new EmptyResult();
         }
 
-        // Helper method to write a chunk of rows asynchronously
+        // Helper for chunked writing
         private async Task WriteChunkAsync(StreamWriter writer, List<string[]> chunk)
         {
-            var tasks = chunk.Select(row => Task.Run(() =>
+            var sb = new StringBuilder();
+
+            foreach (var row in chunk)
             {
-                var sb = new StringBuilder();
                 for (int i = 0; i < row.Length; i++)
                 {
                     sb.Append($"\"{row[i]}\"");
                     if (i < row.Length - 1) sb.Append(",");
                 }
-                return sb.ToString();
-            })).ToList();
-
-            var formattedRows = await Task.WhenAll(tasks);
-            foreach (var row in formattedRows)
-            {
-                await writer.WriteLineAsync(row);
+                sb.AppendLine();
             }
+
+            await writer.WriteAsync(sb.ToString());
         }
-
-
-
-
     }
 
-}
+    }
