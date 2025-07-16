@@ -189,55 +189,75 @@ namespace newtestextract.Controllers
                 ["CategorisationMIFID"] = "text",
                 ["LieuNegociation"] = "text"
             };
+            var columnMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "DateEffet", "dateffet" },
+                { "DatTraitement", "dattraitement" },
+                // add others if needed
+            };
 
-            // Build SQL query
             var query = new StringBuilder("SELECT * FROM dbo.TestData WHERE 1=1");
             using var conn = new SqlConnection(connectionString);
             using var cmd = new SqlCommand { Connection = conn };
 
-            // Handle filters
             foreach (var key in filterFields.Keys)
             {
                 if (form.ContainsKey(key) && !string.IsNullOrWhiteSpace(form[key]))
                 {
+                    string baseKey = key;
+                    bool isStart = false, isEnd = false;
+                    if (key.EndsWith("Start"))
+                    {
+                        baseKey = key.Substring(0, key.Length - "Start".Length);
+                        isStart = true;
+                    }
+                    else if (key.EndsWith("End"))
+                    {
+                        baseKey = key.Substring(0, key.Length - "End".Length);
+                        isEnd = true;
+                    }
+
+                    string columnName = columnMap.ContainsKey(baseKey) ? columnMap[baseKey] : baseKey;
+
                     if (filterFields[key] == "date" && DateTime.TryParse(form[key], out var dateValue))
                     {
-                        if (key.EndsWith("Start"))
-                            query.Append($" AND {key.Replace("Start", "")} >= @{key}");
-                        else if (key.EndsWith("End"))
+                        if (isStart)
+                            query.Append($" AND {columnName} >= @{key}");
+                        else if (isEnd)
                         {
                             dateValue = dateValue.Date.AddDays(1).AddTicks(-1);
-                            query.Append($" AND {key.Replace("End", "")} <= @{key}");
+                            query.Append($" AND {columnName} <= @{key}");
                         }
                         cmd.Parameters.AddWithValue($"@{key}", dateValue);
                     }
                     else
                     {
-                        query.Append($" AND {key} = @{key}");
+                        query.Append($" AND {columnName} = @{key}");
                         cmd.Parameters.AddWithValue($"@{key}", form[key].ToString());
                     }
                 }
             }
 
-            // Sorting
-            var validColumns = new HashSet<string>(filterFields.Keys.Select(k => k.ToLower())) { "id", "dateffet" };
+            var validColumns = new HashSet<string>(filterFields.Keys.Select(k => k.ToLower()))
+            {
+                "id", "dateffet"
+            };
             if (string.IsNullOrEmpty(sortColumn) || !validColumns.Contains(sortColumn.ToLower()))
                 sortColumn = "dateffet";
+
             sortDirection = sortDirection?.ToUpper() == "ASC" ? "ASC" : "DESC";
+
             query.Append($" ORDER BY {sortColumn} {sortDirection}");
 
-            // Pagination
             int offset = (page - 1) * pageSize;
             query.Append($" OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY");
 
-            // Get username and filters used
             var username = HttpContext.Session.GetString("username") ?? "Unknown";
             var excludedKeys = new HashSet<string> { "__RequestVerificationToken", "page", "filters" };
             var filtersUsed = string.Join(", ",
                 form.Keys.Where(k => !excludedKeys.Contains(k) && !string.IsNullOrWhiteSpace(form[k]) && form[k] != "on")
                          .Select(k => $"{k}={form[k]}"));
 
-            // Log export (async)
             _ = Task.Run(async () =>
             {
                 try
@@ -245,25 +265,22 @@ namespace newtestextract.Controllers
                     using var logConn = new SqlConnection(connectionString);
                     await logConn.OpenAsync();
                     string logQuery = @"
-                INSERT INTO ExportLog (Username, ExportedAt, FiltersUsed)
-                VALUES (@Username, @ExportedAt, @FiltersUsed)";
+                        INSERT INTO ExportLog (Username, ExportedAt, FiltersUsed)
+                        VALUES (@Username, @ExportedAt, @FiltersUsed)";
                     using var logCmd = new SqlCommand(logQuery, logConn);
                     logCmd.Parameters.AddWithValue("@Username", username);
                     logCmd.Parameters.AddWithValue("@ExportedAt", DateTime.Now);
                     logCmd.Parameters.AddWithValue("@FiltersUsed", filtersUsed);
                     await logCmd.ExecuteNonQueryAsync();
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    // Optionally log error
+                    // Optional: log error
                 }
             });
 
-            // Set up CSV response
             Response.ContentType = "text/csv";
             Response.Headers.Add("Content-Disposition", $"attachment; filename=export_page{page}.csv");
-
-            // Append export finished cookie (will stay even if download is cancelled early)
             Response.Cookies.Append("exportFinished", "true", new CookieOptions
             {
                 Expires = DateTimeOffset.UtcNow.AddMinutes(2),
@@ -281,7 +298,6 @@ namespace newtestextract.Controllers
             {
                 await using var writer = new StreamWriter(Response.Body, Encoding.UTF8, bufferSize: 65536, leaveOpen: true);
 
-                // Write CSV header
                 for (int i = 0; i < reader.FieldCount; i++)
                 {
                     await writer.WriteAsync(reader.GetName(i));
@@ -289,7 +305,6 @@ namespace newtestextract.Controllers
                 }
                 await writer.WriteLineAsync();
 
-                // Process data in chunks
                 const int chunkSize = 100;
                 var chunk = new List<string[]>(chunkSize);
 
@@ -315,17 +330,14 @@ namespace newtestextract.Controllers
 
                 await writer.FlushAsync();
             }
-            catch (IOException ex)
+            catch (IOException)
             {
-                // Handle client disconnect / file deletion gracefully
-                // Example: Client canceled the download => IOException
-                // You can log this if needed but no need to crash
+                // Client disconnect handling
             }
 
             return new EmptyResult();
         }
 
-        // Helper for chunked writing
         private async Task WriteChunkAsync(StreamWriter writer, List<string[]> chunk)
         {
             var sb = new StringBuilder();
@@ -343,5 +355,4 @@ namespace newtestextract.Controllers
             await writer.WriteAsync(sb.ToString());
         }
     }
-
-    }
+}
