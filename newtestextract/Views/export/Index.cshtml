@@ -535,64 +535,63 @@
             });
         }
 
-               // Progress tracking functions
-        let progressInterval;
-        let progressCheckCount = 0;
-        const maxProgressChecks = 60; // Timeout after 5 minutes (60 checks * 5 seconds)
+                      let operationId = null;
 
-        function startProgressTracking() {
-            progressCheckCount = 0;
-            updateProgress(0, "Starting export process...");
+        async function startExport() {
+            // Show loader
+            document.getElementById('loaderOverlay').style.display = 'flex';
 
-            // Check progress every 5 seconds
-            progressInterval = setInterval(checkProgress, 5000);
+            // Generate operation ID
+            operationId = crypto.randomUUID();
+
+            // Start progress tracking
+            trackProgress(operationId);
+
+            // Submit form with operation ID
+            const form = document.getElementById('exportForm');
+            const formData = new FormData(form);
+            formData.append('operationId', operationId);
+
+            try {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Export failed');
+            } catch (error) {
+                console.error('Export error:', error);
+                updateProgress(0, `Error: ${error.message}`);
+            }
         }
 
-        function checkProgress() {
-            progressCheckCount++;
+        function trackProgress(opId) {
+            const interval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/export/progress?operationId=${opId}`);
+                    const data = await response.json();
 
-            if (progressCheckCount > maxProgressChecks) {
-                clearInterval(progressInterval);
-                updateProgress(100, "Process timed out - please check back later");
-                return;
-            }
+                    updateProgress(
+                        data.percentage,
+                        data.message
+                    );
 
-            fetch('/export/GetProgress')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.progress >= 100) {
-                        clearInterval(progressInterval);
-                        updateProgress(100, "Completed!");
+                    if (data.percentage >= 100) {
+                        clearInterval(interval);
                         setTimeout(() => {
-                            document.getElementById("loaderOverlay").style.display = "none";
+                            document.getElementById('loaderOverlay').style.display = 'none';
                         }, 1000);
-                    } else {
-                        updateProgress(data.progress, data.message || "Processing...");
                     }
-                })
-                .catch(error => {
-                    console.error("Error checking progress:", error);
-                    updateProgress(0, "Error checking progress - please wait...");
-                });
+                } catch (error) {
+                    console.error('Progress check failed:', error);
+                }
+            }, 1000); // Check every second
         }
 
         function updateProgress(percent, message) {
-            const progressBar = document.getElementById("progressBar");
-            const progressPercent = document.getElementById("progressPercent");
-            const progressStatus = document.getElementById("progressStatus");
-
-            progressBar.style.width = `${percent}%`;
-            progressPercent.textContent = `${percent}%`;
-            progressStatus.textContent = message;
-
-            // Change color based on progress
-            if (percent < 30) {
-                progressBar.style.backgroundColor = "#FF5252"; // Red
-            } else if (percent < 70) {
-                progressBar.style.backgroundColor = "#FFC107"; // Yellow
-            } else {
-                progressBar.style.backgroundColor = "#4CAF50"; // Green
-            }
+            document.getElementById('progressBar').style.width = `${percent}%`;
+            document.getElementById('progressText').textContent = `${percent}%`;
+            document.getElementById('loadingMessage').textContent = message;
         }
 
         // Modify your showLoader function
