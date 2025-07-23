@@ -1,7 +1,10 @@
+using newtestextract;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddSignalR();
 //********1
 builder.Services.AddSession();
 builder.Services.AddHttpContextAccessor();
@@ -27,8 +30,12 @@ app.UseRouting();
 app.UseCookiePolicy();
 app.UseAuthorization();
 builder.Services.AddLogging(logging => logging.AddConsole());
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=account}/{action=login}/{id?}");
+app.UseEndpoints(endpoints =>
+{
+    endpoints.MapControllerRoute(
+        name: "default",
+        pattern: "{controller=account}/{action=login}/{id?}");
 
+    endpoints.MapHub<ProgressHub>("/progressHub");
+});
 app.Run();

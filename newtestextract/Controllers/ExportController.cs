@@ -1,4 +1,5 @@
-﻿using System.Data;
+﻿using System.Collections.Concurrent;
+using System.Data;
 using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -10,7 +11,7 @@ namespace newtestextract.Controllers
     public class exportController : Controller
     {
         private readonly IConfiguration _config;
-
+        public static ConcurrentDictionary<string, int> ProgressStore = new();
         public exportController(IConfiguration config)
         {
             _config = config;
@@ -154,205 +155,331 @@ namespace newtestextract.Controllers
             return Json(result);
         }
         [HttpPost]
+
         public async Task<IActionResult> Export(IFormCollection form, int page = 1, int pageSize = 1000, string sortColumn = null, string sortDirection = "DESC")
+
         {
+            _currentProgress = 0;
+            _currentStatus = "Preparing data...";
+
             string connectionString = _config.GetConnectionString("DefaultConnection");
+            string progressKey = HttpContext.Session.GetString("username") ?? Guid.NewGuid().ToString();
+            ProgressStore[progressKey] = 0;
+             _currentProgress = 0;
+    _currentStatus = "Preparing data...";
+
             var filterFields = new Dictionary<string, string>
+
             {
+
                 ["DateEffetStart"] = "date",
+
                 ["DateEffetEnd"] = "date",
+
                 ["DatTraitementStart"] = "date",
+
                 ["DatTraitementEnd"] = "date",
+
                 ["CodSens"] = "text",
+
                 ["Qte"] = "number",
+
                 ["Crs"] = "number",
+
                 ["MntBrutDevNegociation"] = "number",
+
                 ["NumCompte"] = "text",
+
                 ["CodSociete"] = "text",
+
                 ["CodAssiste"] = "text",
+
                 ["NomAbrege"] = "text",
+
                 ["TypGestion"] = "text",
+
                 ["CodIsin"] = "text",
+
                 ["LibValeur"] = "text",
+
                 ["CodOperation"] = "text",
+
                 ["CodMarche"] = "text",
+
                 ["CodAnnulation"] = "text",
+
                 ["Nom"] = "text",
-                ["Adr1"] = "text",
-                ["Adr2"] = "text",
-                ["Adr3"] = "text",
-                ["Adr4"] = "text",
-                ["Adr5"] = "text",
-                ["Adr6"] = "text",
+
+
+
                 ["AdrVille"] = "text",
+
                 ["CodGerant"] = "text",
+
                 ["CategorisationMIFID"] = "text",
+
                 ["LieuNegociation"] = "text"
-            };
-            var columnMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                { "DateEffet", "dateffet" },
-                { "DatTraitement", "dattraitement" },
-                // add others if needed
+
             };
 
-            var query = new StringBuilder("SELECT * FROM dbo.TestData WHERE 1=1");
+
+
+
+            var query = new StringBuilder("SELECT * FROM TestData WHERE 1=1");
+
             using var conn = new SqlConnection(connectionString);
+
             using var cmd = new SqlCommand { Connection = conn };
+            _currentProgress = 10;
+            _currentStatus = "Querying database...";
 
-            foreach (var key in filterFields.Keys)
+
+            if (form.ContainsKey("DateEffetStart") && DateTime.TryParse(form["DateEffetStart"], out var dateEffetStart))
+
             {
-                if (form.ContainsKey(key) && !string.IsNullOrWhiteSpace(form[key]))
-                {
-                    string baseKey = key;
-                    bool isStart = false, isEnd = false;
-                    if (key.EndsWith("Start"))
-                    {
-                        baseKey = key.Substring(0, key.Length - "Start".Length);
-                        isStart = true;
-                    }
-                    else if (key.EndsWith("End"))
-                    {
-                        baseKey = key.Substring(0, key.Length - "End".Length);
-                        isEnd = true;
-                    }
 
-                    string columnName = columnMap.ContainsKey(baseKey) ? columnMap[baseKey] : baseKey;
+                query.Append(" AND dateffet >= @DateEffetStart");
 
-                    if (filterFields[key] == "date" && DateTime.TryParse(form[key], out var dateValue))
-                    {
-                        if (isStart)
-                            query.Append($" AND {columnName} >= @{key}");
-                        else if (isEnd)
-                        {
-                            dateValue = dateValue.Date.AddDays(1).AddTicks(-1);
-                            query.Append($" AND {columnName} <= @{key}");
-                        }
-                        cmd.Parameters.AddWithValue($"@{key}", dateValue);
-                    }
-                    else
-                    {
-                        query.Append($" AND {columnName} = @{key}");
-                        cmd.Parameters.AddWithValue($"@{key}", form[key].ToString());
-                    }
-                }
+                cmd.Parameters.AddWithValue("@DateEffetStart", dateEffetStart);
+
             }
 
-            var validColumns = new HashSet<string>(filterFields.Keys.Select(k => k.ToLower()))
+            if (form.ContainsKey("DateEffetEnd") && DateTime.TryParse(form["DateEffetEnd"], out var dateEffetEnd))
+
             {
-                "id", "dateffet"
-            };
+
+                query.Append(" AND dateffet <= @DateEffetEnd");
+
+                cmd.Parameters.AddWithValue("@DateEffetEnd", dateEffetEnd);
+
+            }
+
+            if (form.ContainsKey("DatTraitementStart") && DateTime.TryParse(form["DatTraitementStart"], out var datTraitementStart))
+
+            {
+
+                query.Append(" AND DatTraitement >= @DatTraitementStart");
+
+                cmd.Parameters.AddWithValue("@DatTraitementStart", datTraitementStart);
+
+            }
+
+            if (form.ContainsKey("DatTraitementEnd") && DateTime.TryParse(form["DatTraitementEnd"], out var datTraitementEnd))
+
+            {
+
+                query.Append(" AND DatTraitement <= @DatTraitementEnd");
+
+                cmd.Parameters.AddWithValue("@DatTraitementEnd", datTraitementEnd);
+
+            }
+
+            _currentProgress = 20;
+            _currentStatus = "Querying database...";
+
+            foreach (var key in filterFields.Keys)
+
+            {
+
+                if (key.Contains("Start") || key.Contains("End")) continue;
+
+
+
+                if (form.ContainsKey(key) && !string.IsNullOrWhiteSpace(form[key]))
+
+                {
+
+                    query.Append($" AND {key} = @{key}");
+
+                    cmd.Parameters.AddWithValue($"@{key}", form[key].ToString());
+
+                }
+
+            }
+
+
+
+            var validColumns = new HashSet<string>(filterFields.Keys.Select(k => k.ToLower())) { "id", "dateffet" };
+
             if (string.IsNullOrEmpty(sortColumn) || !validColumns.Contains(sortColumn.ToLower()))
+
                 sortColumn = "dateffet";
+
+
 
             sortDirection = sortDirection?.ToUpper() == "ASC" ? "ASC" : "DESC";
 
             query.Append($" ORDER BY {sortColumn} {sortDirection}");
 
-            int offset = (page - 1) * pageSize;
-            query.Append($" OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY");
+
+
+            var excludedKeys = new HashSet<string>
+
+{
+
+    "__RequestVerificationToken", "page", "filters"
+
+};
+
+
+
+            var filtersUsed = string.Join(", ",
+
+                form.Keys
+
+                .Where(k => !excludedKeys.Contains(k))
+
+                .Where(k => !string.IsNullOrWhiteSpace(form[k]) && form[k] != "on")
+
+                .Select(k => $"{k}={form[k]}"));
+
+
 
             var username = HttpContext.Session.GetString("username") ?? "Unknown";
-            var excludedKeys = new HashSet<string> { "__RequestVerificationToken", "page", "filters" };
-            var filtersUsed = string.Join(", ",
-                form.Keys.Where(k => !excludedKeys.Contains(k) && !string.IsNullOrWhiteSpace(form[k]) && form[k] != "on")
-                         .Select(k => $"{k}={form[k]}"));
+            _currentProgress = 25;
+            _currentStatus = "Querying database...";
 
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    using var logConn = new SqlConnection(connectionString);
-                    await logConn.OpenAsync();
-                    string logQuery = @"
-                        INSERT INTO ExportLog (Username, ExportedAt, FiltersUsed)
-                        VALUES (@Username, @ExportedAt, @FiltersUsed)";
-                    using var logCmd = new SqlCommand(logQuery, logConn);
-                    logCmd.Parameters.AddWithValue("@Username", username);
-                    logCmd.Parameters.AddWithValue("@ExportedAt", DateTime.Now);
-                    logCmd.Parameters.AddWithValue("@FiltersUsed", filtersUsed);
-                    await logCmd.ExecuteNonQueryAsync();
-                }
-                catch (Exception)
-                {
-                    // Optional: log error
-                }
-            });
 
-            Response.ContentType = "text/csv";
-            Response.Headers.Add("Content-Disposition", $"attachment; filename=export_page{page}.csv");
-            Response.Cookies.Append("exportFinished", "true", new CookieOptions
+            using (var logConn = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+
             {
-                Expires = DateTimeOffset.UtcNow.AddMinutes(2),
-                HttpOnly = false,
-                SameSite = SameSiteMode.Lax
-            });
+
+                logConn.Open();
+
+
+
+                string logQuery = @"
+
+        INSERT INTO RD2_ExportLog (Username, ExportedAt, FiltersUsed)
+
+        VALUES (@Username, @ExportedAt, @FiltersUsed)";
+
+
+
+                using (var cdmd = new SqlCommand(logQuery, logConn))
+
+                {
+
+                    cdmd.Parameters.AddWithValue("@Username", username);
+
+                    cdmd.Parameters.AddWithValue("@ExportedAt", DateTime.Now);
+
+                    cdmd.Parameters.AddWithValue("@FiltersUsed", filtersUsed);
+
+                    // remove this one if you have the write permission****************
+
+                    // cdmd.ExecuteNonQuery();
+
+                }
+
+            }
+
+            _currentProgress = 30;
+            _currentStatus = "Processing records...";
+            _currentProgress = 34;
+            _currentStatus = "Processing records...";
+           
 
             cmd.CommandText = query.ToString();
+
             cmd.CommandTimeout = 600;
 
+ _currentProgress = 37;
+            _currentStatus = "Processing records...";
+            _currentProgress = 40;
+            _currentStatus = "Processing records...";
+
+            Response.ContentType = "text/csv";
+
+            Response.Headers.Add("Content-Disposition", $"attachment; filename=export_page{page}.csv");
+
+
+            _currentProgress = 50;
+            _currentStatus = "Generating CSV file...";
+            _currentProgress = 60;
+            _currentStatus = "Generating CSV file...";
+            _currentProgress = 67;
+            _currentStatus = "Generating CSV file...";
+
+
+
             await conn.OpenAsync();
+
             await using var reader = await cmd.ExecuteReaderAsync();
 
-            try
-            {
-                await using var writer = new StreamWriter(Response.Body, Encoding.UTF8, bufferSize: 65536, leaveOpen: true);
+            await using var writer = new StreamWriter(Response.Body, Encoding.UTF8, bufferSize: 65536, leaveOpen: true);
 
+
+
+            for (int i = 0; i < reader.FieldCount; i++)
+
+            {
+
+                await writer.WriteAsync(reader.GetName(i));
+
+                if (i < reader.FieldCount - 1) await writer.WriteAsync(",");
+
+            }
+
+            await writer.WriteLineAsync();
+
+            _currentProgress = 70;
+            _currentStatus = "Finalizing export...";
+            _currentProgress = 80;
+            _currentStatus = "Finalizing export...";
+
+            while (await reader.ReadAsync())
+            {
                 for (int i = 0; i < reader.FieldCount; i++)
                 {
-                    await writer.WriteAsync(reader.GetName(i));
+                    var value = reader[i]?.ToString()?.Replace("\"", "\"\"") ?? "";
+                    await writer.WriteAsync($"\"{value}\"");
                     if (i < reader.FieldCount - 1) await writer.WriteAsync(",");
                 }
                 await writer.WriteLineAsync();
 
-                const int chunkSize = 100;
-                var chunk = new List<string[]>(chunkSize);
-
-                while (await reader.ReadAsync())
-                {
-                    var row = new string[reader.FieldCount];
-                    for (int i = 0; i < reader.FieldCount; i++)
-                    {
-                        row[i] = reader[i]?.ToString()?.Replace("\"", "\"\"") ?? "";
-                    }
-
-                    chunk.Add(row);
-
-                    if (chunk.Count >= chunkSize)
-                    {
-                        await WriteChunkAsync(writer, chunk);
-                        chunk.Clear();
-                    }
-                }
-
-                if (chunk.Count > 0)
-                    await WriteChunkAsync(writer, chunk);
-
-                await writer.FlushAsync();
+            
             }
-            catch (IOException)
+
+            _currentProgress = 80;
+            _currentStatus = "Finalizing export...";
+
+            Response.Cookies.Append("exportFinished", "true", new CookieOptions
+
             {
-                // Client disconnect handling
-            }
 
+                Expires = DateTimeOffset.UtcNow.AddMinutes(2),
+
+                HttpOnly = false,
+
+                SameSite = SameSiteMode.Lax
+
+            });
+            _currentProgress = 90;
+            _currentStatus = "Finalizing export...";
+
+            await writer.FlushAsync();
+          
+            _currentProgress = 100;
+            _currentStatus = "Export complete!";
             return new EmptyResult();
+
         }
 
-        private async Task WriteChunkAsync(StreamWriter writer, List<string[]> chunk)
+
+        private static int _currentProgress = 0;
+        private static string _currentStatus = "Starting...";
+
+
+        [HttpGet]
+        public IActionResult GetProgress()
         {
-            var sb = new StringBuilder();
-
-            foreach (var row in chunk)
+            return Json(new
             {
-                for (int i = 0; i < row.Length; i++)
-                {
-                    sb.Append($"\"{row[i]}\"");
-                    if (i < row.Length - 1) sb.Append(",");
-                }
-                sb.AppendLine();
-            }
-
-            await writer.WriteAsync(sb.ToString());
+                progress = _currentProgress,
+                message = _currentStatus
+            });
         }
-    }
-}
+
+
+    } }

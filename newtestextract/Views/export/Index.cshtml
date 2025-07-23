@@ -410,194 +410,271 @@
             }
         </div>
     </div>
-<!-- Loader Overlay -->
-<div id="loaderOverlay" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; justify-content: center; align-items: center;">
-    <div style="text-align: center; color: white;">
-        <div class="spinner-border" role="status" style="width: 3rem; height: 3rem; color: #4895ef;"></div>
-        <h3 style="margin-top: 20px;">Processing your request</h3>
-        <p style="color: rgba(255,255,255,0.8);">This may take several minutes...</p>
+    <!-- Loader Overlay -->
+    <div id="loaderOverlay" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; justify-content: center; align-items: center;">
+        <div style="text-align: center; color: white; width: 80%; max-width: 500px;">
+            <div class="spinner-border" role="status" style="width: 3rem; height: 3rem; color: #4895ef;"></div>
+            <h3 style="margin-top: 20px;">Processing your request</h3>
+            <p style="color: rgba(255,255,255,0.8);">This may take several minutes...</p>
+
+            <!-- Progress Bar Container -->
+            <div style="margin-top: 20px; width: 100%;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span id="progressStatus">Starting...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div style="width: 100%; height: 10px; background-color: rgba(255,255,255,0.2); border-radius: 5px; overflow: hidden;">
+                    <div id="progressBar" style="height: 100%; width: 0%; background-color: var(--accent-color); transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
-<!-- Font Awesome for icons -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
-<!-- JavaScript -->
-<script>
-       // Main filter management functions
-    function toggleFilter(id, forceShow = false) {
-        const container = document.getElementById(id);
-        const checkbox = document.getElementById("chk_" + id);
+    <!-- JavaScript -->
+    <script>
+           // Main filter management functions
+        function toggleFilter(id, forceShow = false) {
+            const container = document.getElementById(id);
+            const checkbox = document.getElementById("chk_" + id);
 
-        if (checkbox.checked || forceShow) {
-            container.style.display = 'block';
-        } else {
-            container.style.display = 'none';
-            if (!forceShow) {
-                clearFilterInputs(container);
-            }
-        }
-    }
-
-    function clearFilterInputs(container) {
-        const inputs = container.querySelectorAll("input");
-        inputs.forEach(input => {
-            if (input.type !== 'hidden') input.value = "";
-        });
-        const suggestions = container.querySelector("ul");
-        if (suggestions) suggestions.innerHTML = "";
-    }
-
-    // Initialize all filters on page load
-    function initializeFilters() {
-        document.querySelectorAll("input[type='checkbox'][id^='chk_']").forEach(cb => {
-            if (cb.checked) toggleFilter(cb.id.replace("chk_", ""), true);
-            cb.addEventListener('change', function() {
-                toggleFilter(this.id.replace("chk_", ""));
-            });
-        });
-    }
-
-    // Form validation with filter persistence
-    function validateFilters() {
-        const checkboxes = document.querySelectorAll("input[type='checkbox'][id^='chk_']:checked");
-        if (checkboxes.length === 0) {
-            showFilterError("Please select at least one filter before submitting.");
-            return false;
-        }
-
-        let hasFilterValue = false;
-        document.querySelectorAll(".filter-field").forEach(filterDiv => {
-            if (filterDiv.style.display !== 'none') {
-                const inputs = filterDiv.querySelectorAll("input[type='text'], input[type='number'], input[type='date']");
-                inputs.forEach(input => {
-                    if (input.value.trim() !== "") hasFilterValue = true;
-                });
-            }
-        });
-
-        if (!hasFilterValue) {
-            showFilterError("Please fill in at least one filter field before submitting.");
-            return false;
-        }
-
-        storeVisibleFilters();
-        return true;
-    }
-
-    function showFilterError(message) {
-        const errorBox = document.getElementById("filterError");
-        errorBox.textContent = message;
-        errorBox.style.display = "block";
-        setTimeout(() => errorBox.style.display = "none", 5000);
-    }
-
-    // Filter state persistence
-    function storeVisibleFilters() {
-        const visibleFilters = [];
-        document.querySelectorAll('.filter-field').forEach(filter => {
-            if (filter.style.display !== 'none') visibleFilters.push(filter.id);
-        });
-        sessionStorage.setItem('visibleFilters', JSON.stringify(visibleFilters));
-    }
-
-    function restoreVisibleFilters() {
-        const visibleFilters = JSON.parse(sessionStorage.getItem('visibleFilters') || '[]');
-        visibleFilters.forEach(filterId => {
-            const checkbox = document.getElementById('chk_' + filterId);
-            if (checkbox) {
-                checkbox.checked = true;
-                toggleFilter(filterId, true);
-            }
-        });
-        sessionStorage.removeItem('visibleFilters');
-    }
-
-    // Show loader for both Show Data and Export actions
-    function setupFormHandlers() {
-        // First ensure loader is hidden on initialization
-        document.getElementById("loaderOverlay").style.display = "none";
-
-        document.getElementById('dataForm').addEventListener('submit', function(e) {
-            if (validateFilters()) {
-                showLoader();
-            }
-        });
-    }
-
-    function showLoader() {
-        const loader = document.getElementById("loaderOverlay");
-        // Reset loader styles to ensure proper positioning
-        loader.style.position = "fixed";
-        loader.style.top = "0";
-        loader.style.left = "0";
-        loader.style.width = "100%";
-        loader.style.height = "100%";
-        loader.style.display = "flex";
-        loader.style.justifyContent = "center";
-        loader.style.alignItems = "center";
-        loader.style.zIndex = "9999";
-        loader.style.backgroundColor = "rgba(0,0,0,0.7)";
-        loader.style.color = "white";
-
-        // Hide loader when page reloads (for Show Data)
-        window.addEventListener('load', function() {
-            document.getElementById("loaderOverlay").style.display = "none";
-        });
-
-        // For Export, check cookie as before
-        const exportButton = document.querySelector('button[formaction*="Export"]');
-        if (exportButton && document.activeElement === exportButton) {
-            const interval = setInterval(() => {
-                if (document.cookie.includes("exportFinished=true")) {
-                    clearInterval(interval);
-                    document.getElementById("loaderOverlay").style.display = "none";
-                    document.cookie = "exportFinished=;expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+            if (checkbox.checked || forceShow) {
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
+                if (!forceShow) {
+                    clearFilterInputs(container);
                 }
-            }, 1000);
+            }
         }
-    }
 
-    // CodIsin autocomplete
-    function setupCodIsinAutocomplete() {
-        const codIsinInput = document.getElementById("codIsinInput");
-        if (codIsinInput) codIsinInput.addEventListener("input", fetchCodIsin);
-    }
+        function clearFilterInputs(container) {
+            const inputs = container.querySelectorAll("input");
+            inputs.forEach(input => {
+                if (input.type !== 'hidden') input.value = "";
+            });
+            const suggestions = container.querySelector("ul");
+            if (suggestions) suggestions.innerHTML = "";
+        }
 
-    function fetchCodIsin() {
-        const term = document.getElementById("codIsinInput").value;
-        const suggestions = document.getElementById("isinSuggestions");
-        suggestions.innerHTML = "";
-
-        if (term.length === 0) return;
-
-        fetch(`/export/SearchCodIsin?term=${encodeURIComponent(term)}`)
-            .then(response => response.json())
-            .then(data => {
-                data.forEach(item => {
-                    const li = document.createElement("li");
-                    li.textContent = item;
-                    li.style.padding = "8px 12px";
-                    li.style.borderBottom = "1px solid #eee";
-                    li.style.transition = "background-color 0.2s";
-                    li.addEventListener("mouseenter", () => li.style.backgroundColor = "#f8f9fa");
-                    li.addEventListener("mouseleave", () => li.style.backgroundColor = "");
-                    li.addEventListener("click", () => {
-                        document.getElementById("codIsinInput").value = item;
-                        suggestions.innerHTML = "";
-                    });
-                    suggestions.appendChild(li);
+        // Initialize all filters on page load
+        function initializeFilters() {
+            document.querySelectorAll("input[type='checkbox'][id^='chk_']").forEach(cb => {
+                if (cb.checked) toggleFilter(cb.id.replace("chk_", ""), true);
+                cb.addEventListener('change', function() {
+                    toggleFilter(this.id.replace("chk_", ""));
                 });
             });
-    }
+        }
 
-    // Initialize everything when DOM is loaded
-    document.addEventListener("DOMContentLoaded", function() {
-        // Ensure loader is hidden on page load
-        document.getElementById("loaderOverlay").style.display = "none";
+        // Form validation with filter persistence
+        function validateFilters() {
+            const checkboxes = document.querySelectorAll("input[type='checkbox'][id^='chk_']:checked");
+            if (checkboxes.length === 0) {
+                showFilterError("Please select at least one filter before submitting.");
+                return false;
+            }
 
-        initializeFilters();
-        setupFormHandlers();
-        setupCodIsinAutocomplete();
-        restoreVisibleFilters();
-    });
-</script>
+            let hasFilterValue = false;
+            document.querySelectorAll(".filter-field").forEach(filterDiv => {
+                if (filterDiv.style.display !== 'none') {
+                    const inputs = filterDiv.querySelectorAll("input[type='text'], input[type='number'], input[type='date']");
+                    inputs.forEach(input => {
+                        if (input.value.trim() !== "") hasFilterValue = true;
+                    });
+                }
+            });
+
+            if (!hasFilterValue) {
+                showFilterError("Please fill in at least one filter field before submitting.");
+                return false;
+            }
+
+            storeVisibleFilters();
+            return true;
+        }
+
+        function showFilterError(message) {
+            const errorBox = document.getElementById("filterError");
+            errorBox.textContent = message;
+            errorBox.style.display = "block";
+            setTimeout(() => errorBox.style.display = "none", 5000);
+        }
+
+        // Filter state persistence
+        function storeVisibleFilters() {
+            const visibleFilters = [];
+            document.querySelectorAll('.filter-field').forEach(filter => {
+                if (filter.style.display !== 'none') visibleFilters.push(filter.id);
+            });
+            sessionStorage.setItem('visibleFilters', JSON.stringify(visibleFilters));
+        }
+
+        function restoreVisibleFilters() {
+            const visibleFilters = JSON.parse(sessionStorage.getItem('visibleFilters') || '[]');
+            visibleFilters.forEach(filterId => {
+                const checkbox = document.getElementById('chk_' + filterId);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    toggleFilter(filterId, true);
+                }
+            });
+            sessionStorage.removeItem('visibleFilters');
+        }
+
+        // Show loader for both Show Data and Export actions
+        function setupFormHandlers() {
+            // First ensure loader is hidden on initialization
+            document.getElementById("loaderOverlay").style.display = "none";
+
+            document.getElementById('dataForm').addEventListener('submit', function(e) {
+                if (validateFilters()) {
+                    showLoader();
+                }
+            });
+        }
+
+               // Progress tracking functions
+        let progressInterval;
+        let progressCheckCount = 0;
+        const maxProgressChecks = 60; // Timeout after 5 minutes (60 checks * 5 seconds)
+
+        function startProgressTracking() {
+            progressCheckCount = 0;
+            updateProgress(0, "Starting export process...");
+
+            // Check progress every 5 seconds
+            progressInterval = setInterval(checkProgress, 5000);
+        }
+
+        function checkProgress() {
+            progressCheckCount++;
+
+            if (progressCheckCount > maxProgressChecks) {
+                clearInterval(progressInterval);
+                updateProgress(100, "Process timed out - please check back later");
+                return;
+            }
+
+            fetch('/export/GetProgress')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.progress >= 100) {
+                        clearInterval(progressInterval);
+                        updateProgress(100, "Completed!");
+                        setTimeout(() => {
+                            document.getElementById("loaderOverlay").style.display = "none";
+                        }, 1000);
+                    } else {
+                        updateProgress(data.progress, data.message || "Processing...");
+                    }
+                })
+                .catch(error => {
+                    console.error("Error checking progress:", error);
+                    updateProgress(0, "Error checking progress - please wait...");
+                });
+        }
+
+        function updateProgress(percent, message) {
+            const progressBar = document.getElementById("progressBar");
+            const progressPercent = document.getElementById("progressPercent");
+            const progressStatus = document.getElementById("progressStatus");
+
+            progressBar.style.width = `${percent}%`;
+            progressPercent.textContent = `${percent}%`;
+            progressStatus.textContent = message;
+
+            // Change color based on progress
+            if (percent < 30) {
+                progressBar.style.backgroundColor = "#FF5252"; // Red
+            } else if (percent < 70) {
+                progressBar.style.backgroundColor = "#FFC107"; // Yellow
+            } else {
+                progressBar.style.backgroundColor = "#4CAF50"; // Green
+            }
+        }
+
+        // Modify your showLoader function
+        function showLoader() {
+            const loader = document.getElementById("loaderOverlay");
+            // Reset loader styles to ensure proper positioning
+            loader.style.position = "fixed";
+            loader.style.top = "0";
+            loader.style.left = "0";
+            loader.style.width = "100%";
+            loader.style.height = "100%";
+            loader.style.display = "flex";
+            loader.style.justifyContent = "center";
+            loader.style.alignItems = "center";
+            loader.style.zIndex = "9999";
+            loader.style.backgroundColor = "rgba(0,0,0,0.7)";
+            loader.style.color = "white";
+
+            // Start progress tracking
+            startProgressTracking();
+
+            // Hide loader when page reloads (for Show Data)
+            window.addEventListener('load', function() {
+                clearInterval(progressInterval);
+                document.getElementById("loaderOverlay").style.display = "none";
+            });
+
+            // For Export, check cookie as before
+            const exportButton = document.querySelector('button[formaction*="Export"]');
+            if (exportButton && document.activeElement === exportButton) {
+                const interval = setInterval(() => {
+                    if (document.cookie.includes("exportFinished=true")) {
+                        clearInterval(interval);
+                        clearInterval(progressInterval);
+                        document.getElementById("loaderOverlay").style.display = "none";
+                        document.cookie = "exportFinished=;expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+                    }
+                }, 1000);
+            }
+        }
+
+        // CodIsin autocomplete
+        function setupCodIsinAutocomplete() {
+            const codIsinInput = document.getElementById("codIsinInput");
+            if (codIsinInput) codIsinInput.addEventListener("input", fetchCodIsin);
+        }
+
+        function fetchCodIsin() {
+            const term = document.getElementById("codIsinInput").value;
+            const suggestions = document.getElementById("isinSuggestions");
+            suggestions.innerHTML = "";
+
+            if (term.length === 0) return;
+
+            fetch(`/export/SearchCodIsin?term=${encodeURIComponent(term)}`)
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(item => {
+                        const li = document.createElement("li");
+                        li.textContent = item;
+                        li.style.padding = "8px 12px";
+                        li.style.borderBottom = "1px solid #eee";
+                        li.style.transition = "background-color 0.2s";
+                        li.addEventListener("mouseenter", () => li.style.backgroundColor = "#f8f9fa");
+                        li.addEventListener("mouseleave", () => li.style.backgroundColor = "");
+                        li.addEventListener("click", () => {
+                            document.getElementById("codIsinInput").value = item;
+                            suggestions.innerHTML = "";
+                        });
+                        suggestions.appendChild(li);
+                    });
+                });
+        }
+
+        // Initialize everything when DOM is loaded
+        document.addEventListener("DOMContentLoaded", function() {
+            // Ensure loader is hidden on page load
+            document.getElementById("loaderOverlay").style.display = "none";
+
+            initializeFilters();
+            setupFormHandlers();
+            setupCodIsinAutocomplete();
+            restoreVisibleFilters();
+        });
+    </script>
