@@ -1,15 +1,21 @@
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using newetestextract.Services;
 using newtestextract;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Services.Configure<KestrelServerOptions>(options =>
+{
+    options.AllowSynchronousIO = true;
+});
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
-builder.Services.AddSingleton<ExportProgressTracker>();
 
 //********1
 builder.Services.AddSession();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<ExportProgressTracker>();
+
 //********1
 var app = builder.Build();
 //********2
