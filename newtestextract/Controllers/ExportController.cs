@@ -62,7 +62,30 @@ public async Task<IActionResult> ShowData(IFormCollection form)
 {
             _currentProgress = 0;
             _currentStatus = "Starting data load...";
+            var formData = new Dictionary<string, string>();
 
+            // Get all fields from the form
+            foreach (var key in form.Keys)
+            {
+                formData[key] = form[key];
+            }
+
+            // Also handle checkboxes (which aren't included if unchecked)
+            var allCheckboxFields = new[] {
+        "DatTraitement", "DateEffet", "CodSens", "Qte", "Crs", "MntBrutDevNegociation", "NumCompte", "CodSociete",
+        "CodAssiste", "NomAbrege", "TypGestion", "CodIsin", "LibValeur", "CodOperation", "CodMarche",
+        "CodAnnulation", "Nom", "AdrVille", "CodGerant", "CategorisationMIFID", "LieuNegociation"
+    };
+
+            foreach (var field in allCheckboxFields)
+            {
+                if (!formData.ContainsKey(field))
+                {
+                    formData[field] = ""; // not checked
+                }
+            }
+
+            ViewBag.FormData = formData;
 
             string connectionString = _config.GetConnectionString("DefaultConnection");
 
