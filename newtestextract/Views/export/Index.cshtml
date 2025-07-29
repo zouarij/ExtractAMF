@@ -1110,7 +1110,18 @@
 
         }
 
+                function autoCopyDate(fromName, toName) {
+            const fromInput = document.querySelector(`input[name='${fromName}']`);
+            const toInput = document.querySelector(`input[name='${toName}']`);
 
+            if (fromInput && toInput) {
+                toInput.addEventListener('focus', function () {
+                    if (!toInput.value) {
+                        toInput.value = fromInput.value;
+                    }
+                });
+            }
+        }
 
         document.addEventListener("DOMContentLoaded", function() {
 
@@ -1125,7 +1136,10 @@
             setupCodIsinAutocomplete();
 
             restoreVisibleFilters();
+                autoCopyDate("DatTraitementStart", "DatTraitementEnd");
+        autoCopyDate("DateEffetStart", "DateEffetEnd");
 
         });
+
 
     </script>
