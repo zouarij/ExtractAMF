@@ -57,171 +57,104 @@ namespace newtestextract.Controllers
             return View();
 
         }
-
         [HttpPost]
-
         public IActionResult ShowData(IFormCollection form, int page = 1)
-
         {
+            _currentProgress = 0;
+            _currentStatus = "Starting to load data...";
 
             const int pageSize = 1000;
-
             var rows = new List<List<string>>();
-
             var columns = new List<string>();
-
             var filters = new List<SqlParameter>();
-
             var whereClause = new StringBuilder("WHERE 1=1");
-
-
 
             ViewBag.FormData = form;
 
-
-
             void AddFilter(string key, string columnName)
-
             {
-
                 if (form.ContainsKey(key) && !string.IsNullOrWhiteSpace(form[key]))
-
                 {
-
                     whereClause.Append($" AND {columnName} = @{key}");
-
                     filters.Add(new SqlParameter($"@{key}", form[key].ToString()));
-
                 }
-
             }
-
-
 
             AddFilter("CodIsin", "CodIsin");
-
             AddFilter("CodSociete", "CodSociete");
-
             AddFilter("TypGestion", "TypGestion");
 
-
-
             if (DateTime.TryParse(form["DateEffetStart"], out var dateEffetStart))
-
             {
-
                 whereClause.Append(" AND Dateffet >= @DateEffetStart");
-
                 filters.Add(new SqlParameter("@DateEffetStart", dateEffetStart));
-
             }
-
             if (DateTime.TryParse(form["DateEffetEnd"], out var dateEffetEnd))
-
             {
-
                 dateEffetEnd = dateEffetEnd.Date.AddDays(1).AddTicks(-1);
-
                 whereClause.Append(" AND Dateffet <= @DateEffetEnd");
-
                 filters.Add(new SqlParameter("@DateEffetEnd", dateEffetEnd));
-
             }
 
-
-
-            int totalRows = 0;
-
-            int totalPages = 0;
+            _currentProgress = 10;
+            _currentStatus = "Filters applied.";
 
             int offset = (page - 1) * pageSize;
 
             using (var conn = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
-
             {
+                _currentProgress = 30;
+                _currentStatus = "Connecting to database...";
 
                 conn.Open();
 
-
-
-                var countCmd = new SqlCommand($"SELECT COUNT(*) testdata {whereClause}", conn);
-
-                countCmd.Parameters.AddRange(filters.Select(p => new SqlParameter(p.ParameterName, p.Value)).ToArray());
-
-                countCmd.CommandTimeout = 600;
-
-
-
-                totalRows = (int)countCmd.ExecuteScalar();
-
-                totalPages = (int)Math.Ceiling(totalRows / (double)pageSize);
-
-
-
                 var query = $@"
-
-            SELECT TOP 1000 * FROM  RD2_V_ExtractionAMF
-
+            SELECT TOP 1000 * FROM testdata
             {whereClause}
-
             ORDER BY Dateffet DESC";
 
-
-
-                var cmd = new SqlCommand(query, conn);
-
-                cmd.Parameters.AddRange(filters.Select(p => new SqlParameter(p.ParameterName, p.Value)).ToArray());
-
-
-
-                cmd.CommandTimeout = 600;
-
-
-
-                using (var reader = cmd.ExecuteReader())
-
+                using (var cmd = new SqlCommand(query, conn))
                 {
+                    cmd.Parameters.AddRange(filters.ToArray());
+                    cmd.CommandTimeout = 600;
 
-                    for (int i = 0; i < reader.FieldCount; i++)
+                    _currentProgress = 50;
+                    _currentStatus = "Querying data...";
 
-                        columns.Add(reader.GetName(i));
-
-
-
-                    while (reader.Read())
-
+                    using (var reader = cmd.ExecuteReader())
                     {
-
-                        var row = new List<string>();
-
                         for (int i = 0; i < reader.FieldCount; i++)
+                            columns.Add(reader.GetName(i));
 
-                            row.Add(reader[i]?.ToString() ?? "");
+                        int processed = 0;
+                        while (reader.Read())
+                        {
+                            var row = new List<string>();
+                            for (int i = 0; i < reader.FieldCount; i++)
+                                row.Add(reader[i]?.ToString() ?? "");
+                            rows.Add(row);
 
-                        rows.Add(row);
-
+                            processed++;
+                            if (processed % 100 == 0)
+                            {
+                                _currentProgress = 70 + (int)((double)processed / 1000 * 20);
+                                _currentStatus = $"Loading {processed} / 1000";
+                            }
+                        }
                     }
-
                 }
-
             }
 
-
+            _currentProgress = 100;
+            _currentStatus = "Data loaded successfully!";
 
             ViewBag.Columns = columns;
-
             ViewBag.PageData = rows;
-
             ViewBag.CurrentPage = page;
-
-            ViewBag.TotalPages = totalPages;
-
-            ViewBag.TotalRows = totalRows;
-
-
+            ViewBag.TotalPages = 1;
+            ViewBag.TotalRows = rows.Count;
 
             return View("Index");
-
         }
 
 
