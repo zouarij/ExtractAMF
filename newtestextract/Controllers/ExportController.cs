@@ -60,7 +60,11 @@ namespace newtestextract.Controllers
         [HttpPost]
 public async Task<IActionResult> ShowData(IFormCollection form)
 {
-    string connectionString = _config.GetConnectionString("DefaultConnection");
+            _currentProgress = 0;
+            _currentStatus = "Starting data load...";
+
+
+            string connectionString = _config.GetConnectionString("DefaultConnection");
 
     var filterFields = new Dictionary<string, string> 
   {
@@ -88,7 +92,9 @@ public async Task<IActionResult> ShowData(IFormCollection form)
                     ["CategorisationMIFID"] = "text",
                     ["LieuNegociation"] = "text"
                 };
-    var query = new StringBuilder("SELECT TOP 1000 * FROM Testdata WHERE 1=1");
+            _currentProgress = 10;
+            _currentStatus = "Applying filters...";
+            var query = new StringBuilder("SELECT TOP 1000 * FROM Testdata WHERE 1=1");
     using var conn = new SqlConnection(connectionString);
     using var cmd = new SqlCommand { Connection = conn };
     // Date filters
@@ -116,8 +122,11 @@ public async Task<IActionResult> ShowData(IFormCollection form)
         cmd.Parameters.AddWithValue("@DatTraitementEnd", datTraitementEnd);
     }
 
-    // Other filters
-    foreach (var key in filterFields.Keys)
+            _currentProgress = 40;
+            _currentStatus = "Fetching data from database...";
+
+            // Other filters
+            foreach (var key in filterFields.Keys)
     {
         if (key.Contains("Start") || key.Contains("End")) continue;
 
@@ -136,18 +145,21 @@ public async Task<IActionResult> ShowData(IFormCollection form)
 
     cmd.CommandText = query.ToString();
     await conn.OpenAsync();
-
-    using var reader = await cmd.ExecuteReaderAsync();
+            using var reader = await cmd.ExecuteReaderAsync();
             var columns = new List<string>();
             var pageData = new List<List<string>>();
 
-            // Get column names from the reader
             for (int i = 0; i < reader.FieldCount; i++)
             {
                 columns.Add(reader.GetName(i));
             }
 
-            // Process data more efficiently
+            _currentProgress = 60;
+            _currentStatus = "Reading rows...";
+
+            int processed = 0;
+            const int maxRows = 1000;
+
             while (await reader.ReadAsync())
             {
                 var row = new List<string>();
@@ -156,9 +168,15 @@ public async Task<IActionResult> ShowData(IFormCollection form)
                     row.Add(reader[i]?.ToString() ?? string.Empty);
                 }
                 pageData.Add(row);
+
+                processed++;
+                _currentProgress = 60 + (int)((double)processed / maxRows * 30);
+                _currentStatus = $"Processing {processed} / {maxRows}";
             }
 
-            // Return the view with optimized data
+            _currentProgress = 100;
+            _currentStatus = "Done loading data";
+
             ViewBag.Columns = columns;
             ViewBag.PageData = pageData;
             ViewBag.CurrentPage = 1;
