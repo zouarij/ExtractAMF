@@ -58,10 +58,10 @@ namespace newtestextract.Controllers
 
         }
         [HttpPost]
-        public IActionResult ShowData(IFormCollection form, int page = 1)
+        public async Task<IActionResult> ShowData(IFormCollection form, int page = 1)
         {
             _currentProgress = 0;
-            _currentStatus = "Starting to load data...";
+            _currentStatus = "Starting data load...";
 
             const int pageSize = 1000;
             var rows = new List<List<string>>();
@@ -89,6 +89,7 @@ namespace newtestextract.Controllers
                 whereClause.Append(" AND Dateffet >= @DateEffetStart");
                 filters.Add(new SqlParameter("@DateEffetStart", dateEffetStart));
             }
+
             if (DateTime.TryParse(form["DateEffetEnd"], out var dateEffetEnd))
             {
                 dateEffetEnd = dateEffetEnd.Date.AddDays(1).AddTicks(-1);
@@ -96,17 +97,12 @@ namespace newtestextract.Controllers
                 filters.Add(new SqlParameter("@DateEffetEnd", dateEffetEnd));
             }
 
-            _currentProgress = 10;
-            _currentStatus = "Filters applied.";
-
-            int offset = (page - 1) * pageSize;
+            _currentProgress = 20;
+            _currentStatus = "Filters applied. Connecting to database...";
 
             using (var conn = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
-                _currentProgress = 30;
-                _currentStatus = "Connecting to database...";
-
-                conn.Open();
+                await conn.OpenAsync();
 
                 var query = $@"
             SELECT TOP 1000 * FROM testdata
@@ -119,15 +115,15 @@ namespace newtestextract.Controllers
                     cmd.CommandTimeout = 600;
 
                     _currentProgress = 50;
-                    _currentStatus = "Querying data...";
+                    _currentStatus = "Fetching data...";
 
-                    using (var reader = cmd.ExecuteReader())
+                    using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         for (int i = 0; i < reader.FieldCount; i++)
                             columns.Add(reader.GetName(i));
 
                         int processed = 0;
-                        while (reader.Read())
+                        while (await reader.ReadAsync())
                         {
                             var row = new List<string>();
                             for (int i = 0; i < reader.FieldCount; i++)
@@ -137,8 +133,8 @@ namespace newtestextract.Controllers
                             processed++;
                             if (processed % 100 == 0)
                             {
-                                _currentProgress = 70 + (int)((double)processed / 1000 * 20);
-                                _currentStatus = $"Loading {processed} / 1000";
+                                _currentProgress = 60 + (int)((double)processed / 1000 * 30);
+                                _currentStatus = $"Loading {processed}/1000 records...";
                             }
                         }
                     }
@@ -146,19 +142,16 @@ namespace newtestextract.Controllers
             }
 
             _currentProgress = 100;
-            _currentStatus = "Data loaded successfully!";
+            _currentStatus = "Data loaded successfully.";
 
             ViewBag.Columns = columns;
             ViewBag.PageData = rows;
             ViewBag.CurrentPage = page;
-            ViewBag.TotalPages = 1;
+            ViewBag.TotalPages = 1; // No need for pagination with TOP 1000
             ViewBag.TotalRows = rows.Count;
 
             return View("Index");
         }
-
-
-
 
 
 
