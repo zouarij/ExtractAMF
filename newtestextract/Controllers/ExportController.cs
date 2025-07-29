@@ -131,35 +131,47 @@ public async Task<IActionResult> ShowData(IFormCollection form)
     var sortColumn = form["sortColumn"].ToString();
     var sortDirection = form["sortDirection"].ToString()?.ToUpper() == "ASC" ? "ASC" : "DESC";
     if (string.IsNullOrEmpty(sortColumn) || !validColumns.Contains(sortColumn.ToLower()))
-        sortColumn = "dateeffet";
+        sortColumn = "dateffet";
     query.Append($" ORDER BY {sortColumn} {sortDirection}");
 
     cmd.CommandText = query.ToString();
     await conn.OpenAsync();
 
-    var results = new List<Dictionary<string, object>>();
     using var reader = await cmd.ExecuteReaderAsync();
+            var columns = new List<string>();
+            var pageData = new List<List<string>>();
 
-    while (await reader.ReadAsync())
-    {
-        var row = new Dictionary<string, object>();
-        for (int i = 0; i < reader.FieldCount; i++)
-        {
-            var value = reader.GetValue(i);
-            row[reader.GetName(i)] = value is DBNull ? null : value;
+            // Get column names from the reader
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                columns.Add(reader.GetName(i));
+            }
+
+            // Process data more efficiently
+            while (await reader.ReadAsync())
+            {
+                var row = new List<string>();
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    row.Add(reader[i]?.ToString() ?? string.Empty);
+                }
+                pageData.Add(row);
+            }
+
+            // Return the view with optimized data
+            ViewBag.Columns = columns;
+            ViewBag.PageData = pageData;
+            ViewBag.CurrentPage = 1;
+            ViewBag.TotalPages = 1;
+
+            return View("Index");
         }
-        results.Add(row);
-    }
-
-    return Json(results);
-        }
 
 
 
 
 
-
-            [HttpPost]
+        [HttpPost]
             public async Task<IActionResult> Export(IFormCollection form, int page = 1, int pageSize = 1000, string sortColumn = null, string sortDirection = "DESC")
             {
                 _currentProgress = 0;
